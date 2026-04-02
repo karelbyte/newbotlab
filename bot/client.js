@@ -10,7 +10,7 @@ import { rmSync, existsSync } from 'fs'
 import path from 'path'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const SESSION_PATH = path.join(__dirname, '../../sessions')
+const SESSION_PATH = path.join(__dirname, '../sessions')
 const API_URL = 'https://storelab.laboratorioclinicointegral.com/api'
 
 const GREETINGS = ['hola', 'saludos', 'buenas', 'buenos dias', 'buenas tardes', 'buenas noches', 'hey', 'hi', 'hello']
