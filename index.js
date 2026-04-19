@@ -1,20 +1,28 @@
-import 'dotenv/config'
-import express from 'express'
-import QRCode from 'qrcode'
-import { startBot, botState } from './bot/client.js'
+require('dotenv').config()
+const express = require('express')
+const QRCode = require('qrcode')
+const { startBot, botState } = require('./bot/client.js')
+const { sendErrorEmail } = require('./errorNotifier.js')
 
 const app = express()
 const PORT = process.env.PORT || 3000
 
 app.use(express.json())
+app.use((req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+  res.setHeader('Pragma', 'no-cache')
+  res.setHeader('Expires', '0')
+  next()
+})
 
 // página principal: muestra QR o estado conectado
 app.get('/', (req, res) => {
-  if (botState.connected) {
+  if (botState.hasConnected) {
     return res.send(`
       <html><body style="font-family:sans-serif;text-align:center;padding:50px">
         <h2>✅ Bot conectado a WhatsApp</h2>
         <p>El bot está activo y escuchando mensajes.</p>
+        <p>Estado actual: ${botState.connected ? 'Conectado' : 'Desconectado (intentando reconectar)'}</p>
       </body></html>
     `)
   }
@@ -34,26 +42,39 @@ app.get('/', (req, res) => {
     <html>
     <head>
       <title>WhatsApp Bot - Escanear QR</title>
+      <meta http-equiv="refresh" content="5">
       <script>
-        // refresca solo la imagen cada 3s con timestamp para evitar caché
         function refreshQR() {
           const img = document.getElementById('qrimg')
           img.src = '/qr?t=' + Date.now()
         }
-        setInterval(refreshQR, 3000)
 
-        // si el bot se conectó, recarga la página completa
-        setInterval(() => {
-          fetch('/status').then(r => r.json()).then(d => {
-            if (d.connected) location.reload()
-          })
-        }, 4000)
+        async function checkStatus() {
+          try {
+            const res = await fetch('/status', { cache: 'no-store' })
+            const data = await res.json()
+            console.log('[BOT UI] status:', data)
+            if (data.hasConnected) {
+              window.location.replace('/')
+            }
+          } catch (err) {
+            console.warn('[BOT UI] Error consultando estado:', err)
+          }
+        }
+
+        window.addEventListener('load', () => {
+          refreshQR()
+          checkStatus()
+          setInterval(refreshQR, 3000)
+          setInterval(checkStatus, 2000)
+        })
       </script>
     </head>
     <body style="font-family:sans-serif;text-align:center;padding:50px">
       <h2>📱 Bot laboratorio clinico integral - Escanea el QR con WhatsApp</h2>
       <p>Abre WhatsApp → Dispositivos vinculados → Vincular dispositivo</p>
-      <img id="qrimg" src="/qr?t=${Date.now()}" alt="QR Code" style="width:300px;height:300px">
+      <p style="color:#555;">Estado: esperando conexión. Se recargará cuando el bot se conecte.</p>
+      <img id="qrimg" src="/qr?t=${Date.now()}" alt="QR Code" style="width:300px;height:300px" onerror="setTimeout(refreshQR,1000)">
       <p style="color:#888;font-size:13px">El QR se actualiza automáticamente</p>
     </body></html>
   `)
@@ -61,7 +82,8 @@ app.get('/', (req, res) => {
 
 // estado del bot para polling desde el frontend
 app.get('/status', (req, res) => {
-  res.json({ connected: botState.connected })
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, proxy-revalidate')
+  res.json({ connected: botState.connected, hasConnected: botState.hasConnected })
 })
 
 // endpoint que devuelve el QR como imagen PNG
@@ -72,15 +94,36 @@ app.get('/qr', async (req, res) => {
   try {
     const png = await QRCode.toBuffer(botState.qr)
     res.setHeader('Content-Type', 'image/png')
-    res.setHeader('Cache-Control', 'no-cache, no-store')
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, proxy-revalidate')
     res.send(png)
   } catch (err) {
     res.status(500).send('Error generando QR')
   }
 })
 
+app.use((err, req, res, next) => {
+  console.error('Express error:', err)
+  void sendErrorEmail('Express error', err)
+  res.status(500).json({ error: 'Ocurrió un error en el servidor' })
+})
+
+process.on('uncaughtException', err => {
+  console.error('uncaughtException:', err)
+  void sendErrorEmail('uncaughtException', err)
+  process.exit(1)
+})
+
+process.on('unhandledRejection', reason => {
+  console.error('unhandledRejection:', reason)
+  const error = reason instanceof Error ? reason : new Error(String(reason))
+  void sendErrorEmail('Unhandled rejection', error)
+})
+
 app.listen(PORT, () => {
   console.log(`Servidor Express en puerto ${PORT}`)
 })
 
-startBot().catch(console.error)
+startBot().catch(err => {
+  console.error('Error iniciando bot:', err)
+  void sendErrorEmail('Error inicializando bot', err)
+})
