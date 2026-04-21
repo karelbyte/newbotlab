@@ -2,10 +2,11 @@ const axios = require('axios')
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY
 const CONTACT_EMAIL = process.env.LAB_CONTACT_EMAIL
-const FROM_EMAIL = process.env.EMAIL_FROM || CONTACT_EMAIL
+const CC_EMAIL = process.env.CC_LAB_CONTACT_EMAIL
+const FROM_EMAIL = process.env.MAIL_FROM || CONTACT_EMAIL
 
 function formatPayload(subject, htmlContent) {
-  return {
+  const payload = {
     from: FROM_EMAIL,
     to: CONTACT_EMAIL,
     subject,
@@ -15,6 +16,13 @@ function formatPayload(subject, htmlContent) {
       <p>Revisa el servidor para más detalles.</p>
     `
   }
+
+  // Agregar CC si está configurado
+  if (CC_EMAIL) {
+    payload.cc = CC_EMAIL
+  }
+
+  return payload
 }
 
 async function sendErrorEmail(subject, error) {

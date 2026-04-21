@@ -15,6 +15,21 @@ const GREETINGS = ['hola', 'saludos', 'buenas', 'buenos dias', 'buenas tardes', 
 // estados por usuario: 'waiting_code' o null
 const userState = new Map()
 
+// Control de throttle para notificaciones de cambios de conexión (evitar correos duplicados)
+const notificationThrottle = new Map()
+const THROTTLE_TIME = 5 * 60 * 1000 // 5 minutos
+
+function canSendNotification(notificationType) {
+  const now = Date.now()
+  const lastTime = notificationThrottle.get(notificationType) || 0
+  if (now - lastTime < THROTTLE_TIME) {
+    console.log(`[THROTTLE] Notificación '${notificationType}' fue enviada hace poco, ignorando.`)
+    return false
+  }
+  notificationThrottle.set(notificationType, now)
+  return true
+}
+
 function isGreeting(text) {
   const normalized = text.toLowerCase().trim()
   return GREETINGS.some(g => normalized.includes(g))
@@ -249,11 +264,13 @@ async function startBot() {
       botState.qr = qr
       botState.connected = false
       console.log('Nuevo QR generado')
-      await sendNotificationEmail(
-        'Bot WhatsApp requiere escaneo QR',
-        'Se ha generado un nuevo QR porque la sesión no está activa o la sesión anterior fue invalidada.',
-        `Estado de conexión: ${connection}`
-      ).catch(err => console.error('Error enviando notificación de QR:', err))
+      if (canSendNotification('qr_generated')) {
+        await sendNotificationEmail(
+          'Bot WhatsApp requiere escaneo QR',
+          'Se ha generado un nuevo QR porque la sesión no está activa o la sesión anterior fue invalidada.',
+          `Estado de conexión: ${connection}`
+        ).catch(err => console.error('Error enviando notificación de QR:', err))
+      }
     }
     if (connection === 'close') {
       botState.connected = false
@@ -261,18 +278,16 @@ async function startBot() {
       const shouldReconnect = statusCode !== DisconnectReason.loggedOut
       console.log('Conexión cerrada. Reconectando:', shouldReconnect)
       if (shouldReconnect) {
-        await sendNotificationEmail(
-          'Bot WhatsApp reconectando sin escaneo',
-          'La conexión se cerró temporalmente y el bot intentará reconectar usando la sesión existente.',
-          `Código de cierre: ${statusCode}`
-        ).catch(err => console.error('Error enviando notificación de reconexión sin QR:', err))
+        console.log('Intentando reconectar automáticamente...')
         startBot()
       } else {
-        await sendNotificationEmail(
-          'Bot WhatsApp requiere nuevo escaneo QR',
-          'La sesión fue cerrada por WhatsApp y se borrará la sesión local para generar un nuevo QR.',
-          `Código de cierre: ${statusCode}`
-        ).catch(err => console.error('Error enviando notificación de reconexión con QR:', err))
+        if (canSendNotification('reconnect_with_qr')) {
+          await sendNotificationEmail(
+            'Bot WhatsApp requiere nuevo escaneo QR',
+            'La sesión fue cerrada por WhatsApp y se borrará la sesión local para generar un nuevo QR.',
+            `Código de cierre: ${statusCode}`
+          ).catch(err => console.error('Error enviando notificación de reconexión con QR:', err))
+        }
         console.log('Sesión cerrada por el usuario, limpiando sesión...')
         botState.qr = null
         if (existsSync(SESSION_PATH)) {
