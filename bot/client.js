@@ -1,14 +1,11 @@
 const pino = require('pino')
 const axios = require('axios')
-const { PrismaClient } = require('@prisma/client')
 const { rmSync, existsSync } = require('fs')
 const path = require('path')
 const { sendErrorEmail, sendNotificationEmail } = require('../errorNotifier.js')
 
 const SESSION_PATH = path.join(__dirname, '../sessions')
 const API_URL = 'https://storelab.laboratorioclinicointegral.com/api'
-
-const prisma = new PrismaClient()
 
 const GREETINGS = ['hola', 'saludos', 'buenas', 'buenos dias', 'buenas tardes', 'buenas noches', 'hey', 'hi', 'hello']
 
@@ -40,23 +37,6 @@ async function getClientName(phone, fallback) {
   const localPhone = normalizedPhone.slice(-10)
 
   try {
-    const client = await prisma.client.findFirst({
-      where: {
-        OR: [
-          { phone: normalizedPhone },
-          { phone: localPhone }
-        ]
-      }
-    })
-    if (client?.name) {
-      return client.name
-    }
-  } catch (err) {
-    console.log('[DB] Error querying client:', err.message)
-    await sendErrorEmail('Error consultando cliente en DB', err)
-  }
-
-  try {
     const apiPhone = localPhone
     const response = await axios.get(`${API_URL}/get-service/${apiPhone}`, {
       timeout: 20000
@@ -65,15 +45,6 @@ async function getClientName(phone, fallback) {
     const name = data?.datatos?.name || data?.name || data?.nombre || data?.cliente?.nombre || data?.client?.name
     if (name) {
       console.log('[API] Cliente encontrado por teléfono:', apiPhone, name)
-      try {
-        await prisma.client.upsert({
-          where: { phone: localPhone },
-          update: { name },
-          create: { phone: localPhone, name }
-        })
-      } catch (saveErr) {
-        console.warn('[DB] No se pudo guardar cliente API en DB:', saveErr.message)
-      }
       return name
     }
     console.log('[API] Cliente no encontrado en API para teléfono:', apiPhone, data)
@@ -93,93 +64,21 @@ async function handleCode(sock, from, phone, code) {
   await sock.sendMessage(from, { text: `🔍 Consultando tu código *${code}*...` })
 
   try {
-    // Primero intenta consultar la DB local
-    let result = await prisma.result.findUnique({
-      where: { barcode: code }
+    const response = await axios.get(`${API_URL}/get-service-by-barcode/${localPhone}/${code}`, {
+      timeout: 30000
     })
-
-    // Si no está en DB, consulta la API
-    if (!result) {
-      try {
-        const response = await axios.get(`${API_URL}/get-service-by-barcode/${localPhone}/${code}`, {
-          timeout: 30000
-        })
-        const data = response.data
-        if (data && data.barcode) {
-          // Guarda en DB para futuras consultas
-          result = await prisma.result.upsert({
-            where: { barcode: code },
-            update: {
-              phone: localPhone,
-              status_id: data.status_id || 2,
-              urls: data.urls || null
-            },
-            create: {
-              barcode: code,
-              phone: localPhone,
-              status_id: data.status_id || 2,
-              urls: data.urls || null
-            }
-          })
-          console.log('[API] Resultado guardado en DB desde API:', code)
-        }
-      } catch (apiErr) {
-        console.log('[API] Error consultando resultado en API:', apiErr.message)
-      }
-    }
-
-    if (!result || result.phone !== localPhone) {
-      console.log('Resultado: Código no encontrado en DB')
+    const data = response.data
+    
+    if (!data || !data.barcode) {
+      console.log('Resultado: Código no encontrado')
       await sock.sendMessage(from, { text: `❌ No se encontró el código: *${code}*` })
-      try {
-        await prisma.queryLog.create({
-          data: {
-            phone: localPhone,
-            barcode: code,
-            found: false,
-            status_id: result?.status_id ?? null,
-            message: 'Código no encontrado'
-          }
-        })
-        console.log('[DB] QueryLog creado: código no encontrado', code)
-      } catch (logErr) {
-        console.error('[DB] No se pudo guardar QueryLog:', logErr)
-      }
-    } else if (result.status_id === 1) {
+    } else if (data.status_id === 1) {
       await sock.sendMessage(from, { text: `🚫 Pendiente de pago. Contacte al (755) 108 48 00.` })
-      try {
-        await prisma.queryLog.create({
-          data: {
-            phone: localPhone,
-            barcode: code,
-            found: true,
-            status_id: result.status_id,
-            message: 'Pendiente de pago'
-          }
-        })
-        console.log('[DB] QueryLog creado: pendiente de pago', code)
-      } catch (logErr) {
-        console.error('[DB] No se pudo guardar QueryLog:', logErr)
-      }
-    } else if (result.status_id === 2) {
-      console.log('Resultado: Entregando documentos', result.urls)
-      try {
-        await prisma.queryLog.create({
-          data: {
-            phone: localPhone,
-            barcode: code,
-            found: true,
-            status_id: result.status_id,
-            message: 'Resultado encontrado y entrega iniciada'
-          }
-        })
-        console.log('[DB] QueryLog creado: resultado encontrado', code)
-      } catch (logErr) {
-        console.error('[DB] No se pudo guardar QueryLog de éxito:', logErr)
-      }
-
+    } else if (data.status_id === 2) {
+      console.log('Resultado: Entregando documentos', data.urls)
+      
       let entregados = 0
-      const urls = result.urls || []
+      const urls = data.urls || []
       for (let i = 0; i < urls.length; i++) {
         const url = urls[i]['path' + i]
         if (!url) continue
@@ -210,23 +109,9 @@ async function handleCode(sock, from, phone, code) {
       }
     }
   } catch (err) {
-    console.log('Error consultando DB:', err.message)
+    console.log('Error consultando API:', err.message)
     await sendErrorEmail(`Error procesando código ${code}`, err)
     await sock.sendMessage(from, { text: `⚠️ Error consultando resultados. Intenta más tarde.` })
-    try {
-      await prisma.queryLog.create({
-        data: {
-          phone: localPhone,
-          barcode: code,
-          found: false,
-          status_id: null,
-          message: `Error al consultar: ${err.message}`
-        }
-      })
-      console.log('[DB] QueryLog creado: error al consultar', code)
-    } catch (logErr) {
-      console.error('[DB] No se pudo guardar QueryLog de error:', logErr)
-    }
   } finally {
     await sock.sendPresenceUpdate('paused', from)
   }
