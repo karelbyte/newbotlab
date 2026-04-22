@@ -243,6 +243,11 @@ async function startBot() {
 
         console.log('[BOT] texto recibido:', text)
 
+        if (!text) {
+          console.log('[BOT] Mensaje ignorado por no contener texto reconocible.')
+          continue
+        }
+
         const normalizedText = text.toLowerCase().trim()
         const codeCandidate = text.toUpperCase().trim()
 
