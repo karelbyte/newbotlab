@@ -19,7 +19,19 @@ app.use((req, res, next) => {
 app.get('/', (req, res) => {
   if (botState.hasConnected) {
     return res.send(`
-      <html><body style="font-family:sans-serif;text-align:center;padding:50px">
+      <html>
+      <head>
+        <script>
+          setInterval(async () => {
+            try {
+              const res = await fetch('/status', { cache: 'no-store' })
+              const data = await res.json()
+              if (!data.hasConnected) window.location.reload()
+            } catch (err) {}
+          }, 5000)
+        </script>
+      </head>
+      <body style="font-family:sans-serif;text-align:center;padding:50px">
         <h2>✅ Bot conectado a WhatsApp</h2>
         <p>El bot está activo y escuchando mensajes.</p>
         <p>Estado actual: ${botState.connected ? 'Conectado' : 'Desconectado (intentando reconectar)'}</p>
@@ -42,7 +54,6 @@ app.get('/', (req, res) => {
     <html>
     <head>
       <title>WhatsApp Bot - Escanear QR</title>
-      <meta http-equiv="refresh" content="5">
       <script>
         function refreshQR() {
           const img = document.getElementById('qrimg')
@@ -65,7 +76,7 @@ app.get('/', (req, res) => {
         window.addEventListener('load', () => {
           refreshQR()
           checkStatus()
-          setInterval(refreshQR, 3000)
+          setInterval(refreshQR, 10000) // 10 segundos
           setInterval(checkStatus, 2000)
         })
       </script>

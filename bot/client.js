@@ -2,10 +2,14 @@ const pino = require('pino')
 const axios = require('axios')
 const { rmSync, existsSync } = require('fs')
 const path = require('path')
+const os = require('os')
 const { sendErrorEmail, sendNotificationEmail } = require('../errorNotifier.js')
+const fs = require('fs')
+const { readdirSync, statSync, unlinkSync } = require('fs')
+const v8 = require('v8')
 
 const SESSION_PATH = path.join(__dirname, '../sessions')
-const API_URL = 'https://storelab.laboratorioclinicointegral.com/api'
+const API_URL = process.env.API_URL || 'https://storelab.laboratorioclinicointegral.com/api'
 
 const GREETINGS = ['hola', 'saludos', 'buenas', 'buenos dias', 'buenas tardes', 'buenas noches', 'hey', 'hi', 'hello']
 
@@ -14,7 +18,10 @@ const userState = new Map()
 
 // Control de throttle para notificaciones de cambios de conexión (evitar correos duplicados)
 const notificationThrottle = new Map()
-const THROTTLE_TIME = 5 * 60 * 1000 // 5 minutos
+const THROTTLE_TIME = 30 * 60 * 1000 // 30 minutos
+
+let reconnectAttempts = 0
+const MAX_RECONNECT_ATTEMPTS = 5
 
 function canSendNotification(notificationType) {
   const now = Date.now()
@@ -68,7 +75,7 @@ async function handleCode(sock, from, phone, code) {
       timeout: 30000
     })
     const data = response.data
-    
+
     if (!data || !data.barcode) {
       console.log('Resultado: Código no encontrado')
       await sock.sendMessage(from, { text: `❌ No se encontró el código: *${code}*` })
@@ -76,23 +83,35 @@ async function handleCode(sock, from, phone, code) {
       await sock.sendMessage(from, { text: `🚫 Pendiente de pago. Contacte al (755) 108 48 00.` })
     } else if (data.status_id === 2) {
       console.log('Resultado: Entregando documentos', data.urls)
-      
+
       let entregados = 0
       const urls = data.urls || []
       for (let i = 0; i < urls.length; i++) {
         const url = urls[i]['path' + i]
         if (!url) continue
         try {
-          const response = await axios.get(url, { responseType: 'arraybuffer', timeout: 30000 })
-          const buffer = Buffer.from(response.data)
+          const response = await axios.get(url, { responseType: 'stream', timeout: 30000 })
           const docName = urls[i]['name' + i] || `Resultado ${i + 1}`
-          const filename = docName.replace(/[,\s]+/g, '_').replace(/_+/g, '_') + '.pdf'
+          const filename = path.join(os.tmpdir(), `${docName.replace(/[\/,\s]+/g, '_')}_${Date.now()}.pdf`)
+
+          // Guardar archivo temporalmente en disco
+          const writer = fs.createWriteStream(filename)
+          response.data.pipe(writer)
+
+          await new Promise((resolve, reject) => {
+            writer.on('finish', resolve)
+            writer.on('error', reject)
+          })
+
           await sock.sendMessage(from, {
-            document: buffer,
+            document: { url: filename },
             mimetype: 'application/pdf',
-            fileName: filename,
+            fileName: docName,
             caption: `📄 ${docName}`
           })
+
+          // Eliminar archivo temporal
+          fs.unlinkSync(filename)
           entregados++
         } catch (err) {
           console.log(`Error descargando PDF ${url}:`, err.message)
@@ -149,7 +168,7 @@ async function startBot() {
       botState.qr = qr
       botState.connected = false
       console.log('Nuevo QR generado')
-      if (canSendNotification('qr_generated')) {
+      if (!botState.hasConnected && canSendNotification('qr_generated')) {
         await sendNotificationEmail(
           'Bot WhatsApp requiere escaneo QR',
           'Se ha generado un nuevo QR porque la sesión no está activa o la sesión anterior fue invalidada.',
@@ -159,14 +178,19 @@ async function startBot() {
     }
     if (connection === 'close') {
       botState.connected = false
+      botState.qr = null // Asegurar que el QR se reinicie correctamente
       const statusCode = lastDisconnect?.error?.output?.statusCode
       const shouldReconnect = statusCode !== DisconnectReason.loggedOut
       console.log('Conexión cerrada. Reconectando:', shouldReconnect)
-      if (shouldReconnect) {
-        console.log('Intentando reconectar automáticamente...')
+      if (shouldReconnect && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+        reconnectAttempts++
+        console.log(`Intentando reconectar automáticamente... (Intento ${reconnectAttempts} de ${MAX_RECONNECT_ATTEMPTS})`)
         startBot()
       } else {
-        if (canSendNotification('reconnect_with_qr')) {
+        if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+          console.error('Se alcanzó el límite máximo de intentos de reconexión.')
+        }
+        if (!botState.hasConnected && canSendNotification('reconnect_with_qr')) {
           await sendNotificationEmail(
             'Bot WhatsApp requiere nuevo escaneo QR',
             'La sesión fue cerrada por WhatsApp y se borrará la sesión local para generar un nuevo QR.',
@@ -175,9 +199,11 @@ async function startBot() {
         }
         console.log('Sesión cerrada por el usuario, limpiando sesión...')
         botState.qr = null
+        botState.hasConnected = false
         if (existsSync(SESSION_PATH)) {
           rmSync(SESSION_PATH, { recursive: true, force: true })
         }
+        reconnectAttempts = 0 // Reset attempts after manual intervention
         startBot()
       }
     }
@@ -185,6 +211,7 @@ async function startBot() {
       botState.qr = null
       botState.connected = true
       botState.hasConnected = true
+      reconnectAttempts = 0 // Reset attempts on successful connection
       console.log('Bot conectado a WhatsApp')
     }
   })
@@ -260,6 +287,61 @@ async function startBot() {
       await sendErrorEmail('Error manejando mensaje de WhatsApp', err)
     }
   })
+}
+
+// Limpieza periódica de mapas para evitar acumulación de memoria
+setInterval(() => {
+  const THROTTLE_CLEANUP_TIME = 2 * 60 * 60 * 1000; // 2 horas
+  const now = Date.now();
+
+  // Limpiar notificationThrottle
+  for (const [key, lastTime] of notificationThrottle.entries()) {
+    if (now - lastTime > THROTTLE_CLEANUP_TIME) {
+      notificationThrottle.delete(key);
+    }
+  }
+
+  // Limpiar userState
+  for (const [key, state] of userState.entries()) {
+    if (state === null) {
+      userState.delete(key);
+    }
+  }
+}, 60 * 60 * 1000); // Ejecutar cada hora
+
+// Limpieza periódica de sesiones antiguas
+setInterval(() => {
+  const SESSION_EXPIRATION_TIME = 7 * 24 * 60 * 60 * 1000; // 7 días
+  const now = Date.now();
+
+  try {
+    const files = readdirSync(SESSION_PATH);
+    for (const file of files) {
+      const filePath = path.join(SESSION_PATH, file);
+      const stats = statSync(filePath);
+      if (now - stats.mtimeMs > SESSION_EXPIRATION_TIME) {
+        unlinkSync(filePath);
+        console.log(`Sesión eliminada: ${file}`);
+      }
+    }
+  } catch (err) {
+    console.error('Error limpiando sesiones antiguas:', err);
+  }
+}, 24 * 60 * 60 * 1000); // Ejecutar cada 24 horas
+
+// Monitorear uso de memoria cada 5 minutos
+setInterval(logMemoryUsage, 5 * 60 * 1000);
+
+function logMemoryUsage() {
+  const memoryUsage = process.memoryUsage();
+  const heapStats = v8.getHeapStatistics();
+
+  console.log('[MEMORY USAGE]');
+  console.log(`RSS: ${(memoryUsage.rss / 1024 / 1024).toFixed(2)} MB`);
+  console.log(`Heap Total: ${(memoryUsage.heapTotal / 1024 / 1024).toFixed(2)} MB`);
+  console.log(`Heap Used: ${(memoryUsage.heapUsed / 1024 / 1024).toFixed(2)} MB`);
+  console.log(`External: ${(memoryUsage.external / 1024 / 1024).toFixed(2)} MB`);
+  console.log(`Heap Limit: ${(heapStats.heap_size_limit / 1024 / 1024).toFixed(2)} MB`);
 }
 
 module.exports = {
