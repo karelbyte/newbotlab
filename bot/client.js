@@ -146,8 +146,9 @@ const botState = {
 }
 
 async function startBot() {
-  const baileys = await import('@whiskeysockets/baileys')
-  const {
+  try {
+    const baileys = await import('@whiskeysockets/baileys')
+    const {
     default: makeWASocket,
     useMultiFileAuthState,
     DisconnectReason,
@@ -160,63 +161,79 @@ async function startBot() {
   const sock = makeWASocket({
     version,
     auth: state,
-    logger: pino({ level: 'silent' })
+    logger: pino({ level: 'silent' }),
+    connectTimeoutMs: 60000,
+    keepAliveIntervalMs: 30000,
+    qrTimeout: 40000,
+    defaultQueryTimeoutMs: 60000
   })
 
   sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
-    if (qr) {
-      botState.qr = qr
-      botState.connected = false
-      console.log('Nuevo QR generado')
-      if (!botState.hasConnected && canSendNotification('qr_generated')) {
-        await sendNotificationEmail(
-          'Bot WhatsApp requiere escaneo QR',
-          'Se ha generado un nuevo QR porque la sesión no está activa o la sesión anterior fue invalidada.',
-          `Estado de conexión: ${connection}`
-        ).catch(err => console.error('Error enviando notificación de QR:', err))
-      }
-    }
-    if (connection === 'close') {
-      botState.connected = false
-      botState.qr = null // Asegurar que el QR se reinicie correctamente
-      const statusCode = lastDisconnect?.error?.output?.statusCode
-      const shouldReconnect = statusCode !== DisconnectReason.loggedOut
-      console.log('Conexión cerrada. Reconectando:', shouldReconnect)
-      if (shouldReconnect && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-        reconnectAttempts++
-        console.log(`Intentando reconectar automáticamente... (Intento ${reconnectAttempts} de ${MAX_RECONNECT_ATTEMPTS})`)
-        startBot()
-      } else {
-        if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-          console.error('Se alcanzó el límite máximo de intentos de reconexión.')
-        }
-        if (!botState.hasConnected && canSendNotification('reconnect_with_qr')) {
+    try {
+      if (qr) {
+        botState.qr = qr
+        botState.connected = false
+        console.log('Nuevo QR generado')
+        if (!botState.hasConnected && canSendNotification('qr_generated')) {
           await sendNotificationEmail(
-            'Bot WhatsApp requiere nuevo escaneo QR',
-            'La sesión fue cerrada por WhatsApp y se borrará la sesión local para generar un nuevo QR.',
-            `Código de cierre: ${statusCode}`
-          ).catch(err => console.error('Error enviando notificación de reconexión con QR:', err))
+            'Bot WhatsApp requiere escaneo QR',
+            'Se ha generado un nuevo QR porque la sesión no está activa o la sesión anterior fue invalidada.',
+            `Estado de conexión: ${connection}`
+          ).catch(err => console.error('Error enviando notificación de QR:', err))
         }
-        console.log('Sesión cerrada por el usuario, limpiando sesión...')
-        botState.qr = null
-        botState.hasConnected = false
-        if (existsSync(SESSION_PATH)) {
-          rmSync(SESSION_PATH, { recursive: true, force: true })
-        }
-        reconnectAttempts = 0 // Reset attempts after manual intervention
-        startBot()
       }
-    }
-    if (connection === 'open') {
-      botState.qr = null
-      botState.connected = true
-      botState.hasConnected = true
-      reconnectAttempts = 0 // Reset attempts on successful connection
-      console.log('Bot conectado a WhatsApp')
+      if (connection === 'close') {
+        botState.connected = false
+        botState.qr = null // Asegurar que el QR se reinicie correctamente
+        const statusCode = lastDisconnect?.error?.output?.statusCode
+        const shouldReconnect = statusCode !== DisconnectReason.loggedOut
+        console.log('Conexión cerrada. Reconectando:', shouldReconnect)
+        if (shouldReconnect && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+          reconnectAttempts++
+          console.log(`Intentando reconectar automáticamente... (Intento ${reconnectAttempts} de ${MAX_RECONNECT_ATTEMPTS})`)
+          startBot()
+        } else {
+          if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+            console.error('Se alcanzó el límite máximo de intentos de reconexión.')
+          }
+          if (!botState.hasConnected && canSendNotification('reconnect_with_qr')) {
+            await sendNotificationEmail(
+              'Bot WhatsApp requiere nuevo escaneo QR',
+              'La sesión fue cerrada por WhatsApp y se borrará la sesión local para generar un nuevo QR.',
+              `Código de cierre: ${statusCode}`
+            ).catch(err => console.error('Error enviando notificación de reconexión con QR:', err))
+          }
+          console.log('Sesión cerrada por el usuario, limpiando sesión...')
+          botState.qr = null
+          botState.hasConnected = false
+          if (existsSync(SESSION_PATH)) {
+            rmSync(SESSION_PATH, { recursive: true, force: true })
+          }
+          reconnectAttempts = 0 // Reset attempts after manual intervention
+          startBot()
+        }
+      }
+      if (connection === 'open') {
+        botState.qr = null
+        botState.connected = true
+        botState.hasConnected = true
+        reconnectAttempts = 0 // Reset attempts on successful connection
+        console.log('Bot conectado a WhatsApp')
+      }
+    } catch (err) {
+      console.error('Error en connection.update:', err)
+      await sendErrorEmail('Error en connection.update', err).catch(emailErr => console.error('Error enviando email:', emailErr))
     }
   })
 
-  sock.ev.on('creds.update', saveCreds)
+  sock.ev.on('creds.update', async (creds) => {
+    try {
+      await saveCreds(creds)
+    } catch (err) {
+      console.error('Error guardando credenciales:', err)
+      await sendErrorEmail('Error guardando credenciales', err).catch(emailErr => console.error('Error enviando email:', emailErr))
+    }
+  })
 
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
     try {
@@ -289,9 +306,15 @@ async function startBot() {
       }
     } catch (err) {
       console.error('Error manejando mensaje de WhatsApp:', err)
-      await sendErrorEmail('Error manejando mensaje de WhatsApp', err)
+      await sendErrorEmail('Error manejando mensaje de WhatsApp', err).catch(emailErr => console.error('Error enviando email:', emailErr))
     }
   })
+  } catch (err) {
+    console.error('Error inicializando bot:', err)
+    await sendErrorEmail('Error inicializando bot', err).catch(emailErr => console.error('Error enviando email:', emailErr))
+    // Reintentar después de un delay
+    setTimeout(() => startBot(), 30000)
+  }
 }
 
 // Limpieza periódica de mapas para evitar acumulación de memoria

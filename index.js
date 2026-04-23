@@ -127,7 +127,15 @@ process.on('uncaughtException', err => {
 process.on('unhandledRejection', reason => {
   console.error('unhandledRejection:', reason)
   const error = reason instanceof Error ? reason : new Error(String(reason))
-  void sendErrorEmail('Unhandled rejection', error)
+
+  // Throttle unhandled rejection emails to prevent spam
+  const now = Date.now()
+  if (!global.lastUnhandledRejectionEmail || now - global.lastUnhandledRejectionEmail > 60 * 60 * 1000) { // 1 hour
+    global.lastUnhandledRejectionEmail = now
+    void sendErrorEmail('Unhandled rejection', error)
+  } else {
+    console.log('[THROTTLE] Unhandled rejection email throttled')
+  }
 })
 
 app.listen(PORT, () => {
