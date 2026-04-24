@@ -19,19 +19,69 @@ const userState = new Map()
 // Control de throttle para notificaciones de cambios de conexión (evitar correos duplicados)
 const notificationThrottle = new Map()
 const THROTTLE_TIME = 30 * 60 * 1000 // 30 minutos
+const QR_NOTIFICATION_THROTTLE_KEY = 'qr_notification'
+const QR_NOTIFICATION_STATE_FILE = path.join(SESSION_PATH, 'last_qr_notification.json')
 
 let reconnectAttempts = 0
 const MAX_RECONNECT_ATTEMPTS = 5
+let botRestartTimeout = null
 
-function canSendNotification(notificationType) {
+function getLastQrNotificationTime() {
+  try {
+    if (!existsSync(QR_NOTIFICATION_STATE_FILE)) return 0
+    const data = fs.readFileSync(QR_NOTIFICATION_STATE_FILE, 'utf8')
+    const parsed = JSON.parse(data)
+    return parsed?.lastTime || 0
+  } catch (err) {
+    console.error('[QR] No se pudo leer el timestamp de notificación:', err.message)
+    return 0
+  }
+}
+
+function setLastQrNotificationTime(time) {
+  try {
+    fs.writeFileSync(QR_NOTIFICATION_STATE_FILE, JSON.stringify({ lastTime: time }), 'utf8')
+  } catch (err) {
+    console.error('[QR] No se pudo guardar el timestamp de notificación:', err.message)
+  }
+}
+
+function canSendNotification(notificationType, throttleTime = THROTTLE_TIME) {
   const now = Date.now()
-  const lastTime = notificationThrottle.get(notificationType) || 0
-  if (now - lastTime < THROTTLE_TIME) {
+  let lastTime = notificationThrottle.get(notificationType) || 0
+
+  if (notificationType === QR_NOTIFICATION_THROTTLE_KEY) {
+    lastTime = Math.max(lastTime, getLastQrNotificationTime())
+  }
+
+  if (now - lastTime < throttleTime) {
     console.log(`[THROTTLE] Notificación '${notificationType}' fue enviada hace poco, ignorando.`)
     return false
   }
+
   notificationThrottle.set(notificationType, now)
+  if (notificationType === QR_NOTIFICATION_THROTTLE_KEY) {
+    setLastQrNotificationTime(now)
+  }
+
   return true
+}
+
+function scheduleBotRestart(delay = 30000) {
+  if (botRestartTimeout) {
+    console.log('[BOT] Reinicio de bot ya programado, ignorando nuevo intento.')
+    return
+  }
+
+  botRestartTimeout = setTimeout(async () => {
+    botRestartTimeout = null
+    console.log(`[BOT] Reiniciando bot tras ${delay / 1000}s...`)
+    try {
+      await startBot()
+    } catch (err) {
+      console.error('Error reiniciando bot:', err)
+    }
+  }, delay)
 }
 
 function isGreeting(text) {
@@ -191,12 +241,12 @@ async function startBot() {
           if (shouldReconnect && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
             reconnectAttempts++
             console.log(`Intentando reconectar automáticamente... (Intento ${reconnectAttempts} de ${MAX_RECONNECT_ATTEMPTS})`)
-            startBot()
+            scheduleBotRestart(20000)
           } else {
             if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
               console.error('Se alcanzó el límite máximo de intentos de reconexión.')
             }
-            if (!botState.hasConnected && canSendNotification('qr_notification')) {
+            if (!botState.hasConnected && canSendNotification(QR_NOTIFICATION_THROTTLE_KEY)) {
               await sendNotificationEmail(
                 'Bot WhatsApp requiere nuevo escaneo QR',
                 'La sesión fue cerrada por WhatsApp y se borrará la sesión local para generar un nuevo QR.',
@@ -210,7 +260,7 @@ async function startBot() {
               rmSync(SESSION_PATH, { recursive: true, force: true })
             }
             reconnectAttempts = 0 // Reset attempts after manual intervention
-            startBot()
+            scheduleBotRestart(60000)
           }
         }
         if (connection === 'open') {
@@ -312,8 +362,7 @@ async function startBot() {
   } catch (err) {
     console.error('Error inicializando bot:', err)
     await sendErrorEmail('Error inicializando bot', err).catch(emailErr => console.error('Error enviando email:', emailErr))
-    // Reintentar después de un delay
-    setTimeout(() => startBot(), 30000)
+    scheduleBotRestart(30000)
   }
 }
 
