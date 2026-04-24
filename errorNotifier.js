@@ -5,6 +5,12 @@ const CONTACT_EMAIL = process.env.LAB_CONTACT_EMAIL
 const CC_EMAIL = process.env.CC_LAB_CONTACT_EMAIL
 const FROM_EMAIL = process.env.MAIL_FROM || CONTACT_EMAIL
 
+function isWithinBusinessHours() {
+  const now = new Date()
+  const hour = now.getHours()
+  return hour >= 8 && hour < 19
+}
+
 function formatPayload(subject, htmlContent) {
   const payload = {
     from: FROM_EMAIL,
@@ -28,6 +34,11 @@ function formatPayload(subject, htmlContent) {
 async function sendErrorEmail(subject, error) {
   if (!RESEND_API_KEY || !CONTACT_EMAIL) {
     console.error('No se puede enviar correo: RESEND_API_KEY o LAB_CONTACT_EMAIL faltan en .env')
+    return
+  }
+
+  if (!isWithinBusinessHours()) {
+    console.log(`[EMAIL] Horario fuera de envío: no se envía email de error (${subject})`)
     return
   }
 
@@ -63,6 +74,11 @@ async function sendErrorEmail(subject, error) {
 async function sendNotificationEmail(subject, message, details = '') {
   if (!RESEND_API_KEY || !CONTACT_EMAIL) {
     console.error('[EMAIL] No se puede enviar correo: RESEND_API_KEY o LAB_CONTACT_EMAIL faltan en .env')
+    return
+  }
+
+  if (!isWithinBusinessHours()) {
+    console.log(`[EMAIL] Horario fuera de envío: no se envía email de notificación (${subject})`)
     return
   }
 
