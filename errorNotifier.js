@@ -59,11 +59,6 @@ async function sendErrorEmail(subject, error) {
     return
   }
 
-  if (!isWithinBusinessHours()) {
-    console.log(`[EMAIL] Horario fuera de envío (${BUSINESS_HOUR_TIMEZONE} ${BUSINESS_HOUR_START}:00-${BUSINESS_HOUR_END}:00): no se envía email de error (${subject})`)
-    return
-  }
-
   try {
     const message = error instanceof Error ? error.message : String(error)
     const stack = error instanceof Error ? error.stack : ''
@@ -93,7 +88,7 @@ async function sendErrorEmail(subject, error) {
   }
 }
 
-async function sendNotificationEmail(subject, message, details = '') {
+async function sendNotificationEmail(subject, message, details = '', ignoreBusinessHours = false) {
   if (!SEND_EMAILS) {
     console.log(`[EMAIL] Envíos desactivados (SEND_EMAILS=false). No se envía email de notificación: ${subject}`)
     return
@@ -104,7 +99,7 @@ async function sendNotificationEmail(subject, message, details = '') {
     return
   }
 
-  if (!isWithinBusinessHours()) {
+  if (!ignoreBusinessHours && !isWithinBusinessHours()) {
     console.log(`[EMAIL] Horario fuera de envío (${BUSINESS_HOUR_TIMEZONE} ${BUSINESS_HOUR_START}:00-${BUSINESS_HOUR_END}:00): no se envía email de notificación (${subject})`)
     return
   }
