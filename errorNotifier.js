@@ -5,11 +5,27 @@ const CONTACT_EMAIL = process.env.LAB_CONTACT_EMAIL
 const CC_EMAIL = process.env.CC_LAB_CONTACT_EMAIL
 const FROM_EMAIL = process.env.MAIL_FROM || CONTACT_EMAIL
 const SEND_EMAILS = !['false', '0', 'no', 'off'].includes(String(process.env.SEND_EMAILS || 'true').toLowerCase())
+const BUSINESS_HOUR_START = Number(process.env.BUSINESS_HOUR_START ?? 8)
+const BUSINESS_HOUR_END = Number(process.env.BUSINESS_HOUR_END ?? 19)
+const BUSINESS_HOUR_TIMEZONE = process.env.BUSINESS_HOUR_TIMEZONE || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+
+function getBusinessHourTime() {
+  try {
+    return new Date(new Intl.DateTimeFormat('en-US', {
+      timeZone: BUSINESS_HOUR_TIMEZONE,
+      hour12: false,
+      hour: 'numeric'
+    }).format(new Date()))
+  } catch (err) {
+    console.error(`[EMAIL] Error calculando hora de negocio con zona '${BUSINESS_HOUR_TIMEZONE}':`, err.message)
+    return new Date()
+  }
+}
 
 function isWithinBusinessHours() {
-  const now = new Date()
+  const now = getBusinessHourTime()
   const hour = now.getHours()
-  return hour >= 8 && hour < 19
+  return hour >= BUSINESS_HOUR_START && hour < BUSINESS_HOUR_END
 }
 
 function formatPayload(subject, htmlContent) {
@@ -44,7 +60,7 @@ async function sendErrorEmail(subject, error) {
   }
 
   if (!isWithinBusinessHours()) {
-    console.log(`[EMAIL] Horario fuera de envío: no se envía email de error (${subject})`)
+    console.log(`[EMAIL] Horario fuera de envío (${BUSINESS_HOUR_TIMEZONE} ${BUSINESS_HOUR_START}:00-${BUSINESS_HOUR_END}:00): no se envía email de error (${subject})`)
     return
   }
 
@@ -89,7 +105,7 @@ async function sendNotificationEmail(subject, message, details = '') {
   }
 
   if (!isWithinBusinessHours()) {
-    console.log(`[EMAIL] Horario fuera de envío: no se envía email de notificación (${subject})`)
+    console.log(`[EMAIL] Horario fuera de envío (${BUSINESS_HOUR_TIMEZONE} ${BUSINESS_HOUR_START}:00-${BUSINESS_HOUR_END}:00): no se envía email de notificación (${subject})`)
     return
   }
 

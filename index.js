@@ -4,6 +4,8 @@ const QRCode = require('qrcode')
 const { startBot, botState } = require('./bot/client.js')
 const { sendErrorEmail } = require('./errorNotifier.js')
 
+const IGNORE_TIMEOUT_UNHANDLED_REJECTIONS = !['false', '0', 'no', 'off'].includes(String(process.env.IGNORE_TIMEOUT_UNHANDLED_REJECTIONS || 'true').toLowerCase())
+
 const app = express()
 const PORT = process.env.PORT || 3000
 
@@ -124,9 +126,27 @@ process.on('uncaughtException', err => {
   process.exit(1)
 })
 
+function shouldReportUnhandledRejection(reason) {
+  if (!IGNORE_TIMEOUT_UNHANDLED_REJECTIONS) return true
+  const error = reason instanceof Error ? reason : new Error(String(reason))
+  const message = String(error.message || '')
+  const payloadMessage = String(reason?.output?.payload?.message || '')
+
+  const isTimeoutError = /timed out/i.test(message) || /request time-?out/i.test(message) || /timed out/i.test(payloadMessage)
+  if (isTimeoutError) {
+    console.log('[UNHANDLED REJECTION] Ignorado por timeout:', message || payloadMessage)
+    return false
+  }
+  return true
+}
+
 process.on('unhandledRejection', reason => {
   console.error('unhandledRejection:', reason)
   const error = reason instanceof Error ? reason : new Error(String(reason))
+
+  if (!shouldReportUnhandledRejection(reason)) {
+    return
+  }
 
   // Throttle unhandled rejection emails to prevent spam
   const now = Date.now()
