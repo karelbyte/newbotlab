@@ -49,6 +49,16 @@ const upload = multer({ storage: storage });
 // RUTAS DE VISTAS (HTML)
 // ==========================================
 
+// Servir lab.png para el simulador y vistas si existe
+app.get('/lab.webp', (req, res) => {
+  const logoPath = path.join(__dirname, 'lab.webp');
+  if (fs.existsSync(logoPath)) {
+    res.sendFile(logoPath);
+  } else {
+    res.status(404).send('Logo no disponible');
+  }
+});
+
 // Página Principal: Centro de Control (Hub)
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'hub.html'));

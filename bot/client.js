@@ -222,7 +222,12 @@ async function processMessage(sock, from, phone, text, pushName = 'desconocido',
       }
     }
 
-    await reply({ type: 'text', text: `*Laboratorio Clínico Integral* 🏥` });
+    const logoPath = path.join(__dirname, '../lab.webp');
+    if (fs.existsSync(logoPath)) {
+      await reply({ type: 'image', url: dryRun ? '/lab.webp' : logoPath, text: `*Laboratorio Clínico Integral* 🏥` });
+    } else {
+      await reply({ type: 'text', text: `*Laboratorio Clínico Integral* 🏥` });
+    }
 
     // Inyectar banner promocional WELCOME
     const welcomePromos = await db.getActivePromotions('WELCOME');
