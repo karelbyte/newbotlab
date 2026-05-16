@@ -1,13 +1,5 @@
-# Usar una imagen base de Node.js ligera
-FROM node:20-slim
-
-# Instalar dependencias del sistema necesarias para algunas librerías
-# (Baileys a veces necesita librerías adicionales para procesar medios, aunque la versión básica es ligera)
-RUN apt-get update && apt-get install -y \
-    python3 \
-    make \
-    g++ \
-    && rm -rf /var/lib/apt/lists/*
+# Usar una imagen base de Node.js estable y completa para poder compilar módulos nativos
+FROM node:20
 
 # Crear directorio de trabajo
 WORKDIR /app
@@ -15,8 +7,8 @@ WORKDIR /app
 # Copiar archivos de dependencias
 COPY package*.json ./
 
-# Instalar dependencias
-RUN npm install --production
+# Instalar dependencias compilando módulos nativos desde código fuente para garantizar compatibilidad con GLIBC
+RUN npm install --production --build-from-source
 
 # Copiar el resto del código
 COPY . .
@@ -24,7 +16,7 @@ COPY . .
 # Crear el directorio de sesiones si no existe
 RUN mkdir -p sessions
 
-# Exponer el puerto que usará Railway (Railway lo asigna automáticamente a PORT)
+# Exponer el puerto que usará Railway
 EXPOSE 3000
 
 # Comando para iniciar la aplicación
