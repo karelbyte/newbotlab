@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Campañas de Difusión | Laboratorio Clínico</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --brand-color: #00509D;
+            --brand-hover: #003F7A;
+            --bg-color: #f3f4f6;
+            --card-bg: #ffffff;
+            --text-main: #1f2937;
+            --text-muted: #6b7280;
+            --success: #10b981;
+            --danger: #ef4444;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            width: 100%;
+            background-color: var(--brand-color);
+            color: white;
+            padding: 20px 0;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .container {
+            max-width: 900px;
+            width: 95%;
+            margin: 30px auto;
+        }
+        .card {
+            background: var(--card-bg);
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            margin-bottom: 30px;
+        }
+        h2 { margin-top: 0; color: var(--brand-color); }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 14px; }
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            font-family: inherit;
+            box-sizing: border-box;
+        }
+        .tip { font-size: 12px; color: var(--text-muted); margin-top: 5px; }
+        button {
+            background-color: var(--brand-color);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover { background-color: var(--brand-hover); }
+        button.secondary { background-color: var(--text-muted); }
+        button.danger { background-color: var(--danger); }
+        button.success { background-color: var(--success); }
+
+        .campaign-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+        .campaign-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #e5e7eb;
+            display: flex;
+            flex-direction: column;
+        }
+        .campaign-text { font-size: 14px; margin: 10px 0; flex-grow: 1; }
+        .campaign-img { 
+            width: 100%; 
+            height: 150px; 
+            object-fit: cover; 
+            border-radius: 8px; 
+            margin-bottom: 10px;
+            background: #f3f4f6;
+        }
+        .campaign-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 15px; }
+        .campaign-actions button { padding: 10px; font-size: 13px; width: 100%; }
+        
+        #sendingOverlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(5px);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            max-width: 450px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+            animation: modalIn 0.3s ease-out;
+        }
+        @keyframes modalIn {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .modal h2 { color: var(--brand-color); margin-bottom: 15px; }
+        .modal p { color: var(--text-muted); line-height: 1.6; margin-bottom: 25px; }
+        .modal .icon-big { font-size: 50px; margin-bottom: 20px; }
+
+        /* Estilos Editor WhatsApp */
+        .whatsapp-toolbar {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 5px;
+        }
+        .whatsapp-toolbar button {
+            padding: 5px 10px;
+            font-size: 12px;
+            background: #e5e7eb;
+            color: #374151;
+            border: 1px solid #d1d5db;
+        }
+        .whatsapp-toolbar button:hover { background: #d1d5db; }
+        
+        .preview-box {
+            margin-top: 10px;
+            padding: 15px;
+            background: #e5ddd5;
+            border-radius: 8px;
+            background-image: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png');
+        }
+        .preview-label { font-size: 12px; font-weight: bold; color: #4b5563; margin-bottom: 8px; }
+        .whatsapp-bubble {
+            background: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            max-width: 85%;
+            font-size: 14.5px;
+            line-height: 1.4;
+            position: relative;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            text-align: left;
+        }
+        .whatsapp-bubble::before {
+            content: "";
+            position: absolute;
+            top: 0; left: -8px;
+            width: 0; height: 0;
+            border-top: 0 solid transparent;
+            border-bottom: 10px solid transparent;
+            border-right: 10px solid white;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Gestión de Campañas de Salud y Prevención</h1>
+</header>
+
+<div id="confirmOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); backdrop-filter: blur(5px); z-index: 1000; justify-content: center; align-items: center;">
+    <div class="modal">
+        <div class="icon-big">⚠️</div>
+        <h2>Confirmar Envío Masivo</h2>
+        <p>¿Estás seguro de enviar esta campaña a TODOS tus pacientes registrados?<br><br>Esto enviará el mensaje a todos los contactos de la base de datos.</p>
+        <div style="display: flex; gap: 10px;">
+            <button class="secondary" style="flex:1" onclick="closeConfirm()">Cancelar</button>
+            <button class="success" style="flex:1" id="confirmActionBtn">Sí, Enviar</button>
+        </div>
+    </div>
+</div>
+
+<div id="sendingOverlay">
+    <div class="modal">
+        <div class="icon-big">🚀</div>
+        <h2>¡Envío de Campaña Iniciado!</h2>
+        <p>
+            El envío masivo ha comenzado con éxito.<br><br>
+            Por seguridad de la cuenta de WhatsApp, los mensajes se enviarán de forma pausada (cada 4-8 segundos).<br><br>
+            <strong>Puedes cerrar esta ventana</strong>; el proceso continuará en segundo plano en el servidor.
+        </p>
+        <button onclick="document.getElementById('sendingOverlay').style.display='none'">Entendido</button>
+    </div>
+</div>
+
+<div class="container">
+    <div style="margin-bottom: 20px; text-align: left;">
+        <a href="/" style="color: var(--brand-color); text-decoration: none; font-weight: 600;">← Volver al Inicio</a>
+    </div>
+
+    <!-- Formulario -->
+    <div class="card">
+        <h2>Nueva Campaña / Aviso de Salud</h2>
+        <div class="form-group">
+            <label>Mensaje de la Campaña</label>
+            <div class="whatsapp-toolbar">
+                <button type="button" onclick="formatText('*')"><b>B</b></button>
+                <button type="button" onclick="formatText('_')"><i>I</i></button>
+                <button type="button" onclick="formatText('~')"><s>S</s></button>
+                <button type="button" onclick="formatText('```')"><code>M</code></button>
+                <button type="button" onclick="formatText('- ')">List</button>
+            </div>
+            <textarea id="campText" rows="4" placeholder="Ej: Hola [nombre], recuerda que realizarte un chequeo anual previene enfermedades silenciosas..." oninput="updatePreview()"></textarea>
+            <div class="tip">💡 Usa el comodín <b>[nombre]</b> para personalizar automáticamente cada mensaje.</div>
+        </div>
+
+        <div class="preview-box">
+            <div class="preview-label">Previsualización del mensaje:</div>
+            <div id="whatsappPreview" class="whatsapp-bubble"></div>
+        </div>
+
+        <div class="form-group" style="margin-top: 15px;">
+            <label>Imagen Adjunta (Opcional - JPG/PNG)</label>
+            <input type="file" id="campFile" accept="image/*">
+        </div>
+        <button onclick="addCampaign()">Guardar Campaña</button>
+    </div>
+
+    <!-- Listado -->
+    <h2>Campañas Guardadas</h2>
+    <div id="campList" class="campaign-list">
+        <!-- Se cargan dinámicamente -->
+    </div>
+</div>
+
+<script>
+    let currentCampaignId = null;
+
+    async function fetchCampaigns() {
+        const res = await fetch('/api/campaigns');
+        const campaigns = await res.json();
+        const container = document.getElementById('campList');
+        container.innerHTML = '';
+
+        campaigns.forEach(c => {
+            const card = document.createElement('div');
+            card.className = 'campaign-card';
+            
+            card.innerHTML = `
+                ${c.image_url ? `<img src="${c.image_url}" class="campaign-img">` : ''}
+                <div class="campaign-text">${c.text.replace(/\*(.*?)\*/g, '<b>$1</b>')}</div>
+                <div class="campaign-actions">
+                    <button class="success" onclick="openConfirm(${c.id})">🚀 ENVIAR A TODOS</button>
+                    <button class="danger" onclick="deleteCampaign(${c.id})">Eliminar</button>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+    }
+
+    // Funciones del Editor WhatsApp
+    function formatText(symbol) {
+        const textarea = document.getElementById('campText');
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const text = textarea.value;
+        const selected = text.substring(start, end);
+
+        if (symbol === '- ') {
+            const before = text.substring(0, start);
+            const after = text.substring(end);
+            textarea.value = before + "\n- " + selected + after;
+        } else {
+            const before = text.substring(0, start);
+            const after = text.substring(end);
+            textarea.value = before + symbol + selected + symbol + after;
+        }
+        
+        textarea.focus();
+        updatePreview();
+    }
+
+    function updatePreview() {
+        const text = document.getElementById('campText').value;
+        const preview = document.getElementById('whatsappPreview');
+        
+        let html = text
+            .replace(/\[nombre\]/gi, '<span style="color:var(--brand-color);font-weight:bold">[Nombre del Paciente]</span>')
+            .replace(/\*(.*?)\*/g, '<b>$1</b>')
+            .replace(/_(.*?)_/g, '<i>$1</i>')
+            .replace(/~(.*?)~/g, '<s>$1</s>')
+            .replace(/```(.*?)```/gs, '<code>$1</code>')
+            .replace(/^- (.*$)/gm, '• $1');
+
+        preview.innerHTML = html || '<span style="color:#999">Escribe algo para previsualizar...</span>';
+    }
+
+    async function addCampaign() {
+        const text = document.getElementById('campText').value;
+        const file = document.getElementById('campFile').files[0];
+
+        if (!text) return alert('El mensaje es obligatorio');
+
+        const formData = new FormData();
+        formData.append('text', text);
+        if (file) formData.append('image', file);
+
+        const res = await fetch('/api/campaigns', {
+            method: 'POST',
+            body: formData
+        });
+
+        if (res.ok) {
+            document.getElementById('campText').value = '';
+            document.getElementById('campFile').value = '';
+            fetchCampaigns();
+        }
+    }
+
+    async function deleteCampaign(id) {
+        if (!confirm('¿Seguro que quieres eliminar esta campaña?')) return;
+        await fetch(`/api/campaigns/${id}`, { method: 'DELETE' });
+        fetchCampaigns();
+    }
+
+    function openConfirm(id) {
+        currentCampaignId = id;
+        document.getElementById('confirmOverlay').style.display = 'flex';
+        document.getElementById('confirmActionBtn').onclick = executeSend;
+    }
+
+    function closeConfirm() {
+        document.getElementById('confirmOverlay').style.display = 'none';
+        currentCampaignId = null;
+    }
+
+    async function executeSend() {
+        if (!currentCampaignId) return;
+        const id = currentCampaignId;
+        closeConfirm();
+        
+        const res = await fetch(`/api/campaigns/${id}/send`, { method: 'POST' });
+        const data = await res.json();
+        
+        if (res.ok) {
+            document.getElementById('sendingOverlay').style.display = 'flex';
+        } else {
+            alert('Error: ' + data.error);
+        }
+    }
+
+    fetchCampaigns();
+</script>
+
+</body>
+</html>

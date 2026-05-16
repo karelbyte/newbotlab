@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Centro de Control | Laboratorio Clínico Integral</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --brand-color: #00509D;
+            --brand-hover: #003F7A;
+            --bg-color: #f3f4f6;
+            --card-bg: #ffffff;
+            --text-main: #1f2937;
+            --text-muted: #6b7280;
+            --whatsapp: #25D366;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            background-image: radial-gradient(circle at top right, #e2effd, transparent 40%),
+                              radial-gradient(circle at bottom left, #eaf2fb, transparent 40%);
+        }
+        header {
+            width: 100%;
+            padding: 40px 0;
+            text-align: center;
+        }
+        header h1 {
+            font-weight: 800;
+            font-size: 32px;
+            color: var(--brand-color);
+            margin: 0;
+        }
+        header p { color: var(--text-muted); margin-top: 10px; }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
+            width: 90%;
+            max-width: 1000px;
+            margin-bottom: 50px;
+        }
+
+        .hub-card {
+            background: var(--card-bg);
+            border-radius: 20px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            text-decoration: none;
+            color: inherit;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            border: 1px solid rgba(0,0,0,0.03);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hub-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 35px rgba(0, 80, 157, 0.1);
+        }
+
+        .icon {
+            font-size: 40px;
+            margin-bottom: 20px;
+        }
+
+        .hub-card h2 {
+            font-size: 20px;
+            margin: 0 0 10px 0;
+            color: var(--brand-color);
+        }
+
+        .hub-card p {
+            font-size: 14px;
+            color: var(--text-muted);
+            line-height: 1.5;
+            margin: 0;
+        }
+
+        /* Status Badge for Connection Card */
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ccc;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        .status-online { background: var(--whatsapp); box-shadow: 0 0 8px var(--whatsapp); }
+        .status-offline { background: #ef4444; }
+
+        .badge {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            background: #f3f4f6;
+            color: var(--text-muted);
+        }
+
+        .btn-main {
+            margin-top: 20px;
+            background: var(--brand-color);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 14px;
+            text-align: center;
+            border: none;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-main:hover {
+            background: var(--brand-hover);
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Bot Laboratorio Clínico</h1>
+    <p>Panel Central de Control del Asistente de Entrega de Resultados</p>
+</header>
+
+<div class="grid">
+    <!-- Card: Conexión -->
+    <a href="/connection" class="hub-card">
+        <div class="icon">🔌</div>
+        <h2>Conexión</h2>
+        <p>Vincula el bot con WhatsApp y revisa el estado del servicio.</p>
+        <div style="margin-top: 15px; font-size: 13px; font-weight: 600;">
+            <span id="status-dot" class="status-dot"></span>
+            <span id="status-text">Cargando...</span>
+        </div>
+    </a>
+
+    <!-- Card: Simulador -->
+    <a href="/simulator" class="hub-card">
+        <div class="icon">💬</div>
+        <h2>Simulador</h2>
+        <p>Prueba las respuestas y flujo de consulta del bot en tiempo real.</p>
+        <span class="btn-main">Abrir Chat</span>
+    </a>
+
+    <!-- Card: Promociones -->
+    <a href="/dashboard" class="hub-card">
+        <div class="icon">🖼️</div>
+        <h2>Anuncios y Promos</h2>
+        <p>Gestiona los avisos y banners dinámicos que se muestran en el chat.</p>
+        <span class="btn-main">Administrar</span>
+    </a>
+
+    <!-- Card: Analítica -->
+    <a href="/analytics" class="hub-card">
+        <div class="icon">📈</div>
+        <h2>Analíticas y Uso</h2>
+        <p>Visualiza estadísticas de consultas resueltas y afluencia diaria.</p>
+        <span class="btn-main">Ver Reportes</span>
+    </a>
+
+    <!-- Card: Campañas -->
+    <a href="/campaigns" class="hub-card">
+        <div class="icon">🚀</div>
+        <h2>Campañas Clínicas</h2>
+        <p>Envía masivos preventivos o promocionales a todos tus pacientes.</p>
+        <span class="btn-main">Difusión</span>
+    </a>
+</div>
+
+<script>
+    async function updateStatus() {
+        try {
+            const res = await fetch('/status');
+            const data = await res.json();
+            const dot = document.getElementById('status-dot');
+            const text = document.getElementById('status-text');
+
+            if (data.connected) {
+                dot.className = 'status-dot status-online';
+                text.innerText = 'Conectado';
+            } else {
+                dot.className = 'status-dot status-offline';
+                text.innerText = 'Desconectado';
+            }
+        } catch(e) {
+            console.error('Error actualizando estado:', e);
+        }
+    }
+
+    setInterval(updateStatus, 5000);
+    updateStatus();
+</script>
+
+</body>
+</html>
