@@ -14,6 +14,10 @@ const SESSION_PATH = PERSISTENT_PATH
   ? path.join(PERSISTENT_PATH, 'sessions') 
   : path.join(__dirname, '../sessions');
 
+const PROMOS_IMGS_PATH = PERSISTENT_PATH 
+  ? path.join(PERSISTENT_PATH, 'promos_imgs') 
+  : path.join(__dirname, '../promos_imgs');
+
 // Asegurar que la carpeta de sesiones exista
 if (!fs.existsSync(SESSION_PATH)) {
   fs.mkdirSync(SESSION_PATH, { recursive: true });
@@ -141,8 +145,12 @@ async function processMessage(sock, from, phone, text, pushName = 'desconocido',
       } else if (msg.type === 'image') {
         let absolutePath = msg.url;
         if (!existsSync(absolutePath)) {
-          const webPath = msg.url.startsWith('/') ? msg.url.slice(1) : msg.url;
-          absolutePath = path.join(__dirname, '..', webPath);
+          if (msg.url.startsWith('/promos_imgs/')) {
+            absolutePath = path.join(PROMOS_IMGS_PATH, msg.url.replace('/promos_imgs/', ''));
+          } else {
+            const webPath = msg.url.startsWith('/') ? msg.url.slice(1) : msg.url;
+            absolutePath = path.join(__dirname, '..', webPath);
+          }
         }
         await sock.sendMessage(from, { image: { url: absolutePath }, caption: msg.text });
       } else if (msg.type === 'pdf') {
@@ -409,7 +417,14 @@ async function sendBroadcast(sock, clients, text, imagePath) {
       const personalizedText = text.replace(/\[nombre\]/gi, client.name || 'Paciente');
 
       if (imagePath) {
-        const absolutePath = path.join(__dirname, '..', imagePath);
+        let absolutePath = imagePath;
+        if (!existsSync(absolutePath)) {
+          if (imagePath.startsWith('/promos_imgs/')) {
+            absolutePath = path.join(PROMOS_IMGS_PATH, imagePath.replace('/promos_imgs/', ''));
+          } else {
+            absolutePath = path.join(__dirname, '..', imagePath);
+          }
+        }
         await sock.sendMessage(jid, { image: { url: absolutePath }, caption: personalizedText });
       } else {
         await sock.sendMessage(jid, { text: personalizedText });
