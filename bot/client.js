@@ -214,9 +214,6 @@ async function processMessage(sock, from, phone, text, pushName = 'desconocido',
       return responses;
     }
 
-      return responses;
-    }
-
     if (normalizedText === 'ver' || normalizedText === 'catálogo' || normalizedText === 'catalogo') {
       const topAnalyses = await db.getAllTopAnalyses();
       if (topAnalyses.length === 0) {
