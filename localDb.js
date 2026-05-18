@@ -56,6 +56,25 @@ async function getLocalDb() {
                     image_url TEXT,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
                 );
+
+                CREATE TABLE IF NOT EXISTS top_analyses (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    number INTEGER UNIQUE,
+                    name TEXT,
+                    description TEXT,
+                    price TEXT,
+                    image_url TEXT,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                );
+
+                CREATE TABLE IF NOT EXISTS agenda (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    client_phone TEXT,
+                    analysis_name TEXT,
+                    schedule_text TEXT,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (client_phone) REFERENCES clients(phone)
+                );
             `);
 
             return db;
@@ -142,6 +161,52 @@ async function deleteCampaign(id) {
 }
 
 // ========================
+// Módulo de Análisis Top
+// ========================
+async function addTopAnalysis(number, name, description, price, image_url) {
+    const db = await getLocalDb();
+    await db.run('INSERT INTO top_analyses (number, name, description, price, image_url) VALUES (?, ?, ?, ?, ?)', [number, name, description, price, image_url]);
+}
+
+async function getAllTopAnalyses() {
+    const db = await getLocalDb();
+    return db.all('SELECT * FROM top_analyses ORDER BY number ASC');
+}
+
+async function getTopAnalysisByNumber(number) {
+    const db = await getLocalDb();
+    return db.get('SELECT * FROM top_analyses WHERE number = ?', [number]);
+}
+
+async function deleteTopAnalysis(id) {
+    const db = await getLocalDb();
+    await db.run('DELETE FROM top_analyses WHERE id = ?', [id]);
+}
+
+// ========================
+// Módulo de Agenda
+// ========================
+async function addAgenda(client_phone, analysis_name, schedule_text) {
+    const db = await getLocalDb();
+    await db.run('INSERT INTO agenda (client_phone, analysis_name, schedule_text) VALUES (?, ?, ?)', [client_phone, analysis_name, schedule_text]);
+}
+
+async function getAllAgendas() {
+    const db = await getLocalDb();
+    return db.all(`
+        SELECT a.id, a.client_phone, c.name as client_name, a.analysis_name, a.schedule_text, a.created_at 
+        FROM agenda a 
+        LEFT JOIN clients c ON a.client_phone = c.phone 
+        ORDER BY a.created_at DESC
+    `);
+}
+
+async function deleteAgenda(id) {
+    const db = await getLocalDb();
+    await db.run('DELETE FROM agenda WHERE id = ?', [id]);
+}
+
+// ========================
 // Módulo de Analítica Clínica
 // ========================
 async function getAnalyticsStats() {
@@ -194,5 +259,12 @@ module.exports = {
     addCampaign,
     getAllCampaigns,
     deleteCampaign,
+    addTopAnalysis,
+    getAllTopAnalyses,
+    getTopAnalysisByNumber,
+    deleteTopAnalysis,
+    addAgenda,
+    getAllAgendas,
+    deleteAgenda,
     getAnalyticsStats
 };

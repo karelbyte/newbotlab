@@ -193,11 +193,11 @@ async function processMessage(sock, from, phone, text, pushName = 'desconocido',
     }
 
     session.state = 'waiting_code';
-    await reply({ type: 'text', text: `Indica tu código de análisis:` });
+    await reply({ type: 'text', text: `Indica tu código de análisis o escribe *VER* para ver nuestra lista de Análisis Top:` });
     return responses;
   }
 
-  // 2. WAITING_CODE: Capturar cancelación o código de barras
+  // 2. WAITING_CODE: Capturar cancelación, código de barras o catálogo
   if (session.state === 'waiting_code') {
     if (['no', 'no gracias', 'nope', 'nel', 'cancelar', 'fin', 'terminar'].includes(normalizedText)) {
       userSessions.delete(from);
@@ -214,7 +214,115 @@ async function processMessage(sock, from, phone, text, pushName = 'desconocido',
       return responses;
     }
 
+      return responses;
+    }
+
+    if (normalizedText === 'ver' || normalizedText === 'catálogo' || normalizedText === 'catalogo') {
+      const topAnalyses = await db.getAllTopAnalyses();
+      if (topAnalyses.length === 0) {
+        await reply({ type: 'text', text: `Por el momento no tenemos análisis destacados en catálogo. Ingresa tu código de barras:` });
+        return responses;
+      }
+
+      await reply({ type: 'text', text: `📋 *Catálogo de Análisis Top*:\nAquí tienes nuestros análisis más solicitados:` });
+      for (const analysis of topAnalyses) {
+        const textMsg = `*Opción #${analysis.number}*\n🧬 *${analysis.name}*\n${analysis.description}\n💰 Precio: ${analysis.price}`;
+        if (analysis.image_url) {
+          await reply({ type: 'image', url: analysis.image_url, text: textMsg });
+        } else {
+          await reply({ type: 'text', text: textMsg });
+        }
+      }
+
+      session.state = 'waiting_analysis_choice';
+      await reply({ type: 'text', text: `¿Te interesa agendar alguno? Escribe el *número* de la opción (ej: 1), o escribe *no* para salir.` });
+      return responses;
+    }
+
     await handleCodeQuery(sock, from, phone, codeCandidate, reply, dryRun);
+    return responses;
+  }
+
+  // AGENDA FLOW: Selección de análisis
+  if (session.state === 'waiting_analysis_choice') {
+    if (['no', 'cancelar', 'salir'].includes(normalizedText)) {
+      session.state = 'waiting_code';
+      await reply({ type: 'text', text: `Entendido. Indica tu código de análisis o escribe *VER* para ver el catálogo nuevamente:` });
+      return responses;
+    }
+
+    const num = parseInt(normalizedText);
+    if (isNaN(num)) {
+      await reply({ type: 'text', text: `Por favor escribe solamente el *número* de la opción que deseas (ej: 1), o *no* para cancelar.` });
+      return responses;
+    }
+
+    const analysis = await db.getTopAnalysisByNumber(num);
+    if (!analysis) {
+      await reply({ type: 'text', text: `No encontré ningún análisis con el número ${num}. Intenta de nuevo.` });
+      return responses;
+    }
+
+    session.selectedAnalysisName = analysis.name;
+    session.state = 'waiting_agenda_day';
+    await reply({ type: 'text', text: `Excelente elección: *${analysis.name}*.\n\nPara agendar tu cita, dime primero: ¿Qué **día** deseas venir? (Escribe solo el número del día, ej: 23)` });
+    return responses;
+  }
+
+  // AGENDA FLOW: Día
+  if (session.state === 'waiting_agenda_day') {
+    const day = parseInt(normalizedText);
+    if (isNaN(day) || day < 1 || day > 31) {
+      await reply({ type: 'text', text: `Por favor ingresa un número de día válido (del 1 al 31).` });
+      return responses;
+    }
+
+    const now = new Date();
+    let month = now.getMonth();
+    let year = now.getFullYear();
+
+    // Si el día introducido es menor al día actual, asumimos que es para el mes siguiente
+    if (day < now.getDate()) {
+      month++;
+      if (month > 11) {
+        month = 0;
+        year++;
+      }
+    }
+
+    const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+    session.agendaDay = day;
+    session.agendaMonthName = monthNames[month];
+    session.agendaYear = year;
+    
+    session.state = 'waiting_agenda_time';
+    await reply({ type: 'text', text: `Perfecto, será el ${day} de ${session.agendaMonthName}.\n\nAhora dime: ¿A qué **hora** te gustaría asistir? (ej: 9:20 am, o 4:00 pm)` });
+    return responses;
+  }
+
+  // AGENDA FLOW: Hora
+  if (session.state === 'waiting_agenda_time') {
+    session.agendaTime = text.trim();
+    session.state = 'waiting_agenda_confirm';
+    await reply({ type: 'text', text: `Resumen de tu cita:\n🧬 Análisis: *${session.selectedAnalysisName}*\n📅 Fecha: *${session.agendaDay} de ${session.agendaMonthName}*\n🕒 Hora: *${session.agendaTime}*\n\n¿Confirmas esta cita? (Responde *si* o *no*)` });
+    return responses;
+  }
+
+  // AGENDA FLOW: Confirmación
+  if (session.state === 'waiting_agenda_confirm') {
+    if (['si', 'sí', 'yes', 'claro', 'ok', 'confirmar', 'confirmo'].includes(normalizedText)) {
+      const scheduleText = `${session.agendaDay} de ${session.agendaMonthName} de ${session.agendaYear} a las ${session.agendaTime}`;
+      
+      if (!dryRun) {
+        await db.addAgenda(phone, session.selectedAnalysisName, scheduleText);
+      }
+      
+      session.state = 'waiting_code';
+      await reply({ type: 'text', text: `✅ ¡Tu cita ha sido agendada exitosamente para el ${scheduleText}!\nTe esperamos en laboratorio.\n\nSi necesitas consultar resultados, indica tu código de análisis.` });
+    } else {
+      session.state = 'waiting_code';
+      await reply({ type: 'text', text: `Cita cancelada. Si necesitas algo más, indica tu código de análisis o escribe *VER* para ver el catálogo.` });
+    }
     return responses;
   }
 
@@ -258,7 +366,7 @@ async function processMessage(sock, from, phone, text, pushName = 'desconocido',
 
     if (clientName) {
       session.state = 'waiting_code';
-      await reply({ type: 'text', text: `Indica tu código de análisis:` });
+      await reply({ type: 'text', text: `Indica tu código de análisis o escribe *VER* para ver nuestra lista de Análisis Top:` });
     } else {
       session.state = 'asking_name';
       await reply({ type: 'text', text: `Para poder brindarte un mejor servicio, ¿cuál es tu nombre y apellido?` });
@@ -394,7 +502,7 @@ async function handleCodeQuery(sock, from, phone, code, reply, dryRun) {
   if (session) {
     session.state = 'waiting_code';
   }
-  await reply({ type: 'text', text: `¿Tienes otro código que consultar? Indícalo o escribe *no* para terminar.` });
+  await reply({ type: 'text', text: `¿Tienes otro código que consultar? Indícalo o escribe *VER* para ver el catálogo, o *no* para terminar.` });
 }
 
 // ==========================================

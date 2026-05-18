@@ -84,6 +84,16 @@ app.get('/simulator', (req, res) => {
   res.sendFile(path.join(__dirname, 'simulator.html'));
 });
 
+// Administrador de Análisis Top
+app.get('/top-analyses-dashboard', (req, res) => {
+  res.sendFile(path.join(__dirname, 'top_analyses.html'));
+});
+
+// Administrador de Agenda
+app.get('/agenda-dashboard', (req, res) => {
+  res.sendFile(path.join(__dirname, 'agenda.html'));
+});
+
 // Vincular QR de WhatsApp (Rebranding Clínico)
 app.get('/connection', (req, res) => {
   if (botState.hasConnected) {
@@ -433,6 +443,59 @@ app.get('/api/analytics', async (req, res) => {
   try {
     const stats = await db.getAnalyticsStats();
     res.json(stats);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ==========================================
+// APIS DE ANÁLISIS TOP (SQLITE CRUD)
+// ==========================================
+app.get('/api/top-analyses', async (req, res) => {
+  try {
+    const analyses = await db.getAllTopAnalyses();
+    res.json(analyses);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/top-analyses', upload.single('image'), async (req, res) => {
+  try {
+    const { number, name, description, price } = req.body;
+    const imageUrl = req.file ? `/promos_imgs/${req.file.filename}` : null;
+    await db.addTopAnalysis(number, name, description, price, imageUrl);
+    res.sendStatus(200);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.delete('/api/top-analyses/:id', async (req, res) => {
+  try {
+    await db.deleteTopAnalysis(req.params.id);
+    res.sendStatus(200);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ==========================================
+// APIS DE AGENDA (SQLITE CRUD)
+// ==========================================
+app.get('/api/agenda', async (req, res) => {
+  try {
+    const agendas = await db.getAllAgendas();
+    res.json(agendas);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.delete('/api/agenda/:id', async (req, res) => {
+  try {
+    await db.deleteAgenda(req.params.id);
+    res.sendStatus(200);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

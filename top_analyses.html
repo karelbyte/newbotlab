@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Análisis Top | Laboratorio Clínico Integral</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --brand-color: #00509D;
+            --brand-hover: #003F7A;
+            --bg-color: #f3f4f6;
+            --card-bg: #ffffff;
+            --text-main: #1f2937;
+            --text-muted: #6b7280;
+            --danger: #ef4444;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 40px 20px;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        .header-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+        .header-bar h1 { margin: 0; color: var(--brand-color); font-weight: 800; }
+        .btn {
+            background: var(--brand-color); color: white; padding: 10px 20px;
+            border-radius: 8px; text-decoration: none; font-weight: 600; cursor: pointer; border: none;
+        }
+        .btn:hover { background: var(--brand-hover); }
+        .btn-danger { background: var(--danger); margin-top: 10px; width: 100%; box-sizing: border-box; }
+        .btn-danger:hover { background: #dc2626; }
+        
+        .card {
+            background: var(--card-bg); padding: 30px; border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 40px;
+        }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; font-weight: 600; margin-bottom: 8px; font-size: 14px; }
+        .form-group input, .form-group textarea {
+            width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px;
+            font-family: inherit; box-sizing: border-box;
+        }
+        .grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px;
+        }
+        .analysis-card {
+            background: white; border-radius: 12px; overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05); border: 1px solid #e5e7eb;
+            display: flex; flex-direction: column;
+        }
+        .analysis-img { width: 100%; height: 200px; object-fit: cover; background: #eee; }
+        .analysis-content { padding: 20px; flex-grow: 1; display: flex; flex-direction: column; }
+        .number-badge {
+            background: var(--brand-color); color: white; padding: 4px 12px;
+            border-radius: 20px; font-size: 12px; font-weight: bold; display: inline-block;
+            margin-bottom: 10px; align-self: flex-start;
+        }
+        .analysis-title { font-weight: bold; font-size: 18px; margin: 0 0 10px 0; }
+        .analysis-desc { font-size: 14px; color: var(--text-muted); margin: 0 0 15px 0; flex-grow: 1; }
+        .analysis-price { font-size: 16px; font-weight: bold; color: #10b981; margin: 0 0 15px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header-bar">
+            <h1>Catálogo de Análisis Top</h1>
+            <a href="/" class="btn">← Volver al Hub</a>
+        </div>
+
+        <div class="card">
+            <h2>Agregar Nuevo Análisis</h2>
+            <form id="addForm">
+                <div class="form-group">
+                    <label>Número Identificador (para que el paciente lo elija, ej: 1)</label>
+                    <input type="number" id="number" required>
+                </div>
+                <div class="form-group">
+                    <label>Nombre del Análisis (ej: Perfil Tiroideo)</label>
+                    <input type="text" id="name" required>
+                </div>
+                <div class="form-group">
+                    <label>Descripción Breve</label>
+                    <textarea id="description" rows="3" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Precio (ej: $500.00)</label>
+                    <input type="text" id="price" required>
+                </div>
+                <div class="form-group">
+                    <label>Imagen Adjunta (JPG/PNG)</label>
+                    <input type="file" id="image" accept="image/*" required>
+                </div>
+                <button type="submit" class="btn">Guardar Análisis</button>
+            </form>
+        </div>
+
+        <h2>Catálogo Actual</h2>
+        <div class="grid" id="analysesList">
+            <!-- Items generados dinámicamente -->
+        </div>
+    </div>
+
+    <script>
+        async function loadAnalyses() {
+            const res = await fetch('/api/top-analyses');
+            const data = await res.json();
+            const container = document.getElementById('analysesList');
+            container.innerHTML = '';
+            
+            data.forEach(item => {
+                container.innerHTML += `
+                    <div class="analysis-card">
+                        ${item.image_url ? `<img src="${item.image_url}" class="analysis-img">` : '<div class="analysis-img"></div>'}
+                        <div class="analysis-content">
+                            <span class="number-badge">Opción #${item.number}</span>
+                            <h3 class="analysis-title">${item.name}</h3>
+                            <p class="analysis-desc">${item.description}</p>
+                            <p class="analysis-price">${item.price}</p>
+                            <button class="btn btn-danger" onclick="deleteAnalysis(${item.id})">Eliminar</button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        document.getElementById('addForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = e.target.querySelector('button');
+            btn.disabled = true;
+            btn.innerText = 'Guardando...';
+
+            const formData = new FormData();
+            formData.append('number', document.getElementById('number').value);
+            formData.append('name', document.getElementById('name').value);
+            formData.append('description', document.getElementById('description').value);
+            formData.append('price', document.getElementById('price').value);
+            formData.append('image', document.getElementById('image').files[0]);
+
+            const res = await fetch('/api/top-analyses', { method: 'POST', body: formData });
+            
+            if(res.ok) {
+                e.target.reset();
+                loadAnalyses();
+            } else {
+                const err = await res.json();
+                alert('Error al guardar: ' + (err.error || 'Desconocido'));
+            }
+            
+            btn.disabled = false;
+            btn.innerText = 'Guardar Análisis';
+        });
+
+        async function deleteAnalysis(id) {
+            if(confirm('¿Seguro que deseas eliminar este análisis?')) {
+                await fetch('/api/top-analyses/' + id, { method: 'DELETE' });
+                loadAnalyses();
+            }
+        }
+
+        loadAnalyses();
+    </script>
+</body>
+</html>
