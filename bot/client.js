@@ -139,7 +139,11 @@ async function processMessage(sock, from, phone, text, pushName = 'desconocido',
       if (msg.type === 'text') {
         await sock.sendMessage(from, { text: msg.text });
       } else if (msg.type === 'image') {
-        const absolutePath = msg.url.startsWith('/') ? path.join(__dirname, '..', msg.url) : msg.url;
+        let absolutePath = msg.url;
+        if (!existsSync(absolutePath)) {
+          const webPath = msg.url.startsWith('/') ? msg.url.slice(1) : msg.url;
+          absolutePath = path.join(__dirname, '..', webPath);
+        }
         await sock.sendMessage(from, { image: { url: absolutePath }, caption: msg.text });
       } else if (msg.type === 'pdf') {
         await sock.sendMessage(from, {
