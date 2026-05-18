@@ -193,7 +193,7 @@ async function processMessage(sock, from, phone, text, pushName = 'desconocido',
     }
 
     session.state = 'waiting_code';
-    await reply({ type: 'text', text: `Indica tu código de análisis o escribe *VER* para ver nuestra lista de Análisis Top:` });
+    await reply({ type: 'text', text: `Indica tu *código de análisis*, escribe *AGENDAR* para pedir una cita, o *VER* para revisar nuestros servicios:` });
     return responses;
   }
 
@@ -214,16 +214,22 @@ async function processMessage(sock, from, phone, text, pushName = 'desconocido',
       return responses;
     }
 
+    if (normalizedText === 'agendar') {
+      session.state = 'waiting_agenda_name';
+      await reply({ type: 'text', text: `¿Para qué análisis o estudio médico te gustaría agendar tu cita? (ej: Perfil Tiroideo, Glucosa, etc.)\nSi deseas cancelar escribe *no*.` });
+      return responses;
+    }
+
     if (normalizedText === 'ver' || normalizedText === 'catálogo' || normalizedText === 'catalogo') {
       const topAnalyses = await db.getAllTopAnalyses();
       if (topAnalyses.length === 0) {
-        await reply({ type: 'text', text: `Por el momento no tenemos análisis destacados en catálogo. Ingresa tu código de barras:` });
+        await reply({ type: 'text', text: `Por el momento no tenemos análisis destacados en catálogo. Ingresa tu código de barras o escribe *AGENDAR*:` });
         return responses;
       }
 
       await reply({ type: 'text', text: `📋 *Catálogo de Análisis Top*:\nAquí tienes nuestros análisis más solicitados:` });
       for (const analysis of topAnalyses) {
-        const textMsg = `*Opción #${analysis.number}*\n🧬 *${analysis.name}*\n${analysis.description}\n💰 Precio: ${analysis.price}`;
+        const textMsg = `🧬 *${analysis.name}*\n${analysis.description}\n💰 Precio: ${analysis.price}`;
         if (analysis.image_url) {
           await reply({ type: 'image', url: analysis.image_url, text: textMsg });
         } else {
@@ -231,8 +237,7 @@ async function processMessage(sock, from, phone, text, pushName = 'desconocido',
         }
       }
 
-      session.state = 'waiting_analysis_choice';
-      await reply({ type: 'text', text: `¿Te interesa agendar alguno? Escribe el *número* de la opción (ej: 1), o escribe *no* para salir.` });
+      await reply({ type: 'text', text: `Si te interesa alguno de estos o buscas otro estudio, escribe *AGENDAR* para pedir una cita, o ingresa tu código de resultados.` });
       return responses;
     }
 
@@ -240,29 +245,17 @@ async function processMessage(sock, from, phone, text, pushName = 'desconocido',
     return responses;
   }
 
-  // AGENDA FLOW: Selección de análisis
-  if (session.state === 'waiting_analysis_choice') {
+  // AGENDA FLOW: Nombre del análisis
+  if (session.state === 'waiting_agenda_name') {
     if (['no', 'cancelar', 'salir'].includes(normalizedText)) {
       session.state = 'waiting_code';
-      await reply({ type: 'text', text: `Entendido. Indica tu código de análisis o escribe *VER* para ver el catálogo nuevamente:` });
+      await reply({ type: 'text', text: `Entendido. Indica tu código de análisis, escribe *AGENDAR* o *VER*:` });
       return responses;
     }
 
-    const num = parseInt(normalizedText);
-    if (isNaN(num)) {
-      await reply({ type: 'text', text: `Por favor escribe solamente el *número* de la opción que deseas (ej: 1), o *no* para cancelar.` });
-      return responses;
-    }
-
-    const analysis = await db.getTopAnalysisByNumber(num);
-    if (!analysis) {
-      await reply({ type: 'text', text: `No encontré ningún análisis con el número ${num}. Intenta de nuevo.` });
-      return responses;
-    }
-
-    session.selectedAnalysisName = analysis.name;
+    session.selectedAnalysisName = text.trim();
     session.state = 'waiting_agenda_day';
-    await reply({ type: 'text', text: `Excelente elección: *${analysis.name}*.\n\nPara agendar tu cita, dime primero: ¿Qué **día** deseas venir? (Escribe solo el número del día, ej: 23)` });
+    await reply({ type: 'text', text: `Excelente elección: *${session.selectedAnalysisName}*.\n\nPara agendar tu cita, dime primero: ¿Qué **día** deseas venir? (Escribe solo el número del día, ej: 23)` });
     return responses;
   }
 
@@ -318,7 +311,7 @@ async function processMessage(sock, from, phone, text, pushName = 'desconocido',
       await reply({ type: 'text', text: `✅ ¡Tu cita ha sido agendada exitosamente para el ${scheduleText}!\nTe esperamos en laboratorio.\n\nSi necesitas consultar resultados, indica tu código de análisis.` });
     } else {
       session.state = 'waiting_code';
-      await reply({ type: 'text', text: `Cita cancelada. Si necesitas algo más, indica tu código de análisis o escribe *VER* para ver el catálogo.` });
+      await reply({ type: 'text', text: `Cita cancelada. Si necesitas algo más, indica tu código de análisis, escribe *AGENDAR* o *VER*.` });
     }
     return responses;
   }
@@ -363,7 +356,7 @@ async function processMessage(sock, from, phone, text, pushName = 'desconocido',
 
     if (clientName) {
       session.state = 'waiting_code';
-      await reply({ type: 'text', text: `Indica tu código de análisis o escribe *VER* para ver nuestra lista de Análisis Top:` });
+      await reply({ type: 'text', text: `Indica tu código de análisis, escribe *AGENDAR* para pedir una cita, o *VER* para revisar nuestros servicios:` });
     } else {
       session.state = 'asking_name';
       await reply({ type: 'text', text: `Para poder brindarte un mejor servicio, ¿cuál es tu nombre y apellido?` });
@@ -499,7 +492,7 @@ async function handleCodeQuery(sock, from, phone, code, reply, dryRun) {
   if (session) {
     session.state = 'waiting_code';
   }
-  await reply({ type: 'text', text: `¿Tienes otro código que consultar? Indícalo o escribe *VER* para ver el catálogo, o *no* para terminar.` });
+  await reply({ type: 'text', text: `¿Tienes otro código que consultar? Indícalo, escribe *AGENDAR* para pedir una cita, *VER* para revisar servicios, o *no* para terminar.` });
 }
 
 // ==========================================
