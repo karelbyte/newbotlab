@@ -72,10 +72,18 @@ async function getLocalDb() {
                     client_phone TEXT,
                     analysis_name TEXT,
                     schedule_text TEXT,
+                    schedule_date TEXT,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (client_phone) REFERENCES clients(phone)
                 );
             `);
+
+            // Migración segura para bases de datos existentes
+            try {
+                await db.exec('ALTER TABLE agenda ADD COLUMN schedule_date TEXT;');
+            } catch (e) {
+                // Columna ya existe
+            }
 
             return db;
         });
@@ -186,19 +194,29 @@ async function deleteTopAnalysis(id) {
 // ========================
 // Módulo de Agenda
 // ========================
-async function addAgenda(client_phone, analysis_name, schedule_text) {
+async function addAgenda(client_phone, analysis_name, schedule_text, schedule_date) {
     const db = await getLocalDb();
-    await db.run('INSERT INTO agenda (client_phone, analysis_name, schedule_text) VALUES (?, ?, ?)', [client_phone, analysis_name, schedule_text]);
+    await db.run('INSERT INTO agenda (client_phone, analysis_name, schedule_text, schedule_date) VALUES (?, ?, ?, ?)', [client_phone, analysis_name, schedule_text, schedule_date]);
 }
 
 async function getAllAgendas() {
     const db = await getLocalDb();
     return db.all(`
-        SELECT a.id, a.client_phone, c.name as client_name, a.analysis_name, a.schedule_text, a.created_at 
+        SELECT a.id, a.client_phone, c.name as client_name, a.analysis_name, a.schedule_text, a.schedule_date, a.created_at 
         FROM agenda a 
         LEFT JOIN clients c ON a.client_phone = c.phone 
         ORDER BY a.created_at DESC
     `);
+}
+
+async function getAgendasByDate(dateStr) {
+    const db = await getLocalDb();
+    return db.all(`
+        SELECT a.id, a.client_phone, c.name as client_name, a.analysis_name, a.schedule_text, a.schedule_date, a.created_at 
+        FROM agenda a 
+        LEFT JOIN clients c ON a.client_phone = c.phone 
+        WHERE a.schedule_date = ?
+    `, [dateStr]);
 }
 
 async function deleteAgenda(id) {
@@ -265,6 +283,7 @@ module.exports = {
     deleteTopAnalysis,
     addAgenda,
     getAllAgendas,
+    getAgendasByDate,
     deleteAgenda,
     getAnalyticsStats
 };

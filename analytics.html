@@ -149,14 +149,14 @@
             }
         });
 
-        // Gráfico de Códigos Consultados
+        // Gráfico de Análisis Agendados
         const ctxProducts = document.getElementById('productsChart').getContext('2d');
         new Chart(ctxProducts, {
             type: 'bar',
             data: {
                 labels: data.topProducts.map(p => p.descrip),
                 datasets: [{
-                    label: 'Veces Consultado',
+                    label: 'Veces Agendado',
                     data: data.topProducts.map(p => p.count),
                     backgroundColor: '#00509D',
                     borderRadius: 5

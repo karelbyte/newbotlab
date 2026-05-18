@@ -492,6 +492,27 @@ app.get('/api/agenda', async (req, res) => {
   }
 });
 
+app.get('/api/agenda/export', async (req, res) => {
+  try {
+    const agendas = await db.getAllAgendas();
+    let csv = 'ID,Telefono,Paciente,Analisis,Fecha_Hora_Cita,Fecha_Registro\n';
+    for (const a of agendas) {
+      const phone = a.client_phone || '';
+      const name = (a.client_name || 'Paciente').replace(/,/g, ' ');
+      const analysis = (a.analysis_name || '').replace(/,/g, ' ');
+      const schedule = (a.schedule_text || '').replace(/,/g, ' ');
+      const created = a.created_at || '';
+      csv += `${a.id},"${phone}","${name}","${analysis}","${schedule}","${created}"\n`;
+    }
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename=agenda_citas.csv');
+    res.status(200).send('\uFEFF' + csv);
+  } catch (err) {
+    console.error('Error exportando agenda:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.delete('/api/agenda/:id', async (req, res) => {
   try {
     await db.deleteAgenda(req.params.id);

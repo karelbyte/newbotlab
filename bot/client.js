@@ -127,6 +127,16 @@ async function getClientName(phone, fallback) {
   return fallback;
 }
 
+// Determinar si nos encontramos fuera del horario laboral (Lun-Vie 7am-5pm)
+function isOutsideBusinessHours() {
+  const now = new Date();
+  const day = now.getDay(); // 0 = Domingo, 6 = Sábado
+  const hour = now.getHours();
+  if (day === 0 || day === 6) return true;
+  if (hour < 7 || hour >= 17) return true;
+  return false;
+}
+
 // ==========================================
 // PROCESADOR UNIFICADO DE MENSAJES (MÁQUINA DE ESTADOS)
 // ==========================================
@@ -164,11 +174,43 @@ async function processMessage(sock, from, phone, text, pushName = 'desconocido',
     }
   }
 
-  // Obtener o crear sesión en memoria
+  // Obtener o crear sesión en memoria con limpieza por inactividad (24 horas)
   let session = userSessions.get(from);
+  const SESSION_TIMEOUT = 24 * 60 * 60 * 1000;
+  if (session && session.lastActive && (Date.now() - session.lastActive > SESSION_TIMEOUT)) {
+    userSessions.delete(from);
+    session = null;
+  }
+
   if (!session) {
-    session = { state: null, name: null };
+    session = { state: null, name: null, lastActive: Date.now() };
     userSessions.set(from, session);
+  }
+
+  // Actualizar marca de tiempo
+  session.lastActive = Date.now();
+
+  // Detección de Palabras Clave (FAQ / Ayuno / Ubicación)
+  // Solo se disparan si el usuario está en un estado neutral (null o waiting_code)
+  const cleanText = normalizedText.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); // Quitar acentos
+  const isNeutralState = session.state === null || session.state === 'waiting_code';
+  
+  if (isNeutralState) {
+    if (['ayuno', 'requisito', 'requisitos', 'preparacion', 'prepararse'].some(k => cleanText.includes(k))) {
+      await reply({
+        type: 'text',
+        text: `🧪 *Guía de Preparación y Ayuno* 🏥\n\nPara garantizar la precisión de tus análisis, por favor sigue estas indicaciones generales:\n\n💉 *Análisis de Sangre (Glucosa, Lípidos, Perfil Tiroideo):*\n- Requiere de **8 a 12 horas** de ayuno estricto.\n- No bebas alcohol ni fumes desde el día anterior.\n- Solo puedes beber un poco de agua simple (sin azúcar, café ni té).\n\n🧪 *Examen de Orina:*\n- Recolecta la primera orina de la mañana.\n- Usa un frasco estéril (disponible en farmacias).\n- Descarta el primer chorro y recolecta el chorro medio.\n\n🤰 *Pruebas de Embarazo (en Sangre):*\n- No requiere ayuno. Puedes realizártela a cualquier hora del día.\n\nSi tienes dudas sobre algún otro estudio específico, ¡pregúntame! 😊`
+      });
+      return responses;
+    }
+    
+    if (['ubicacion', 'donde estan', 'donde queda', 'mapa', 'direccion', 'dirección'].some(k => cleanText.includes(k))) {
+      await reply({
+        type: 'text',
+        text: `📍 *Nuestra Ubicación* 🏥\n\nEstamos ubicados en:\n*Saturno 15, Zona Industrial, Zihuatanejo, Gro.*\n\n🗺️ *Google Maps:*\nhttps://maps.google.com/?q=17.6464,-101.5478\n\n🕐 Nuestro horario de atención es de Lunes a Viernes de 7:00 AM a 5:00 PM. ¡Te esperamos! 😊`
+      });
+      return responses;
+    }
   }
 
   // 1. ASKING_NAME: Capturar el nombre del nuevo paciente
@@ -193,7 +235,7 @@ async function processMessage(sock, from, phone, text, pushName = 'desconocido',
     }
 
     session.state = 'waiting_code';
-    await reply({ type: 'text', text: `Indica tu *código de análisis*, escribe *AGENDAR* para pedir una cita, o *VER* para revisar nuestros servicios:` });
+    await reply({ type: 'text', text: `Indica tu *Código de análisis*, escribe *AGENDAR* para pedir una cita, o *VER* para revisar nuestros servicios:` });
     return responses;
   }
 
@@ -302,9 +344,13 @@ async function processMessage(sock, from, phone, text, pushName = 'desconocido',
   if (session.state === 'waiting_agenda_confirm') {
     if (['si', 'sí', 'yes', 'claro', 'ok', 'confirmar', 'confirmo'].includes(normalizedText)) {
       const scheduleText = `${session.agendaDay} de ${session.agendaMonthName} de ${session.agendaYear} a las ${session.agendaTime}`;
+      const monthNum = String(session.agendaMonth + 1).padStart(2, '0');
+      const dayNum = String(session.agendaDay).padStart(2, '0');
+      const yearNum = session.agendaYear;
+      const scheduleDate = `${yearNum}-${monthNum}-${dayNum}`;
       
       if (!dryRun) {
-        await db.addAgenda(phone, session.selectedAnalysisName, scheduleText);
+        await db.addAgenda(phone, session.selectedAnalysisName, scheduleText, scheduleDate);
       }
       
       session.state = 'waiting_code';
@@ -349,9 +395,14 @@ async function processMessage(sock, from, phone, text, pushName = 'desconocido',
       });
     }
 
+    let greetingNotice = '';
+    if (isOutsideBusinessHours()) {
+      greetingNotice = `⚠️ *Aviso de Horario:* Actualmente nuestras oficinas físicas están cerradas (Lun-Vie 7am-5pm). Sin embargo, nuestro sistema automático está activo 24/7 para entregarte resultados o agendar tu cita. 🤖\n\n`;
+    }
+
     await reply({
       type: 'text',
-      text: `📍 Saturno 15, Zona Industrial, Zihuatanejo, Gro.\n🕐 Horario: Lunes a Viernes 7:00am - 5:00pm\n🌐 https://laboratorioclinicointegral.com/\n\n${clientName ? `Bienvenido 👋 *${clientName}*` : 'Bienvenido 👋'}`
+      text: `${greetingNotice}📍 Saturno 15, Zona Industrial, Zihuatanejo, Gro.\n🕐 Horario: Lunes a Viernes 7:00am - 5:00pm\n🌐 https://laboratorioclinicointegral.com/\n\n${clientName ? `Bienvenido 👋 *${clientName}*` : 'Bienvenido 👋'}`
     });
 
     if (clientName) {
@@ -621,6 +672,7 @@ async function startBot() {
           botState.connected = true;
           botState.hasConnected = true;
           reconnectAttempts = 0;
+          sockInstance = sock;
           console.log('Bot conectado a WhatsApp');
         }
       } catch (err) {
@@ -735,6 +787,56 @@ function logMemoryUsage() {
   console.log(`External: ${(memoryUsage.external / 1024 / 1024).toFixed(2)} MB`);
   console.log(`Heap Limit: ${(heapStats.heap_size_limit / 1024 / 1024).toFixed(2)} MB`);
 }
+
+// Recordatorios automáticos de citas ejecutados diariamente a las 8:00 AM
+let lastRemindersRunDate = '';
+function startAppointmentReminders() {
+  console.log('[RECORDATORIOS] Scheduler de recordatorios de citas iniciado.');
+  setInterval(async () => {
+    try {
+      const now = new Date();
+      const todayStr = now.toISOString().split('T')[0];
+      
+      // Ejecutar solo si son las 8:00 AM y no ha corrido hoy
+      if (now.getHours() === 8 && lastRemindersRunDate !== todayStr) {
+        lastRemindersRunDate = todayStr;
+        console.log('[RECORDATORIOS] Iniciando envío de recordatorios diarios...');
+        
+        if (!sockInstance || !botState.connected) {
+          console.log('[RECORDATORIOS] El bot no está conectado. Postponiendo envío.');
+          lastRemindersRunDate = ''; // Permitir reintentar en el siguiente intervalo si se conecta
+          return;
+        }
+
+        // Obtener la fecha de mañana en formato YYYY-MM-DD
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
+        
+        const agendas = await db.getAgendasByDate(tomorrowStr);
+        console.log(`[RECORDATORIOS] Se encontraron ${agendas.length} citas para mañana (${tomorrowStr}).`);
+
+        for (const agenda of agendas) {
+          try {
+            const clientName = agenda.client_name || 'Paciente';
+            const reminderText = `🔔 *Recordatorio de Cita* 🏥\n\nHola *${clientName}*, te recordamos que tienes una cita agendada para el día de **mañana** para tu estudio:\n\n🧬 *${agenda.analysis_name}*\n🕐 Fecha y Hora: *${agenda.schedule_text}*\n\n📍 Dirección: Saturno 15, Zona Industrial, Zihuatanejo, Gro.\n\nTe esperamos con la preparación indicada. Si tienes dudas sobre tu ayuno o preparación, puedes escribirme *AYUNO*. 😊`;
+            
+            await sockInstance.sendMessage(agenda.client_phone, { text: reminderText });
+            console.log(`[RECORDATORIOS] Recordatorio enviado exitosamente a ${agenda.client_phone}`);
+            // Esperar 3 segundos para evitar spam
+            await new Promise(r => setTimeout(r, 3000));
+          } catch (sendErr) {
+            console.error(`[RECORDATORIOS] Error al enviar recordatorio a ${agenda.client_phone}:`, sendErr.message);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[RECORDATORIOS] Error general en el scheduler de recordatorios:', err.message);
+    }
+  }, 10 * 60 * 1000); // Revisar cada 10 minutos
+}
+
+startAppointmentReminders();
 
 module.exports = {
   botState,
