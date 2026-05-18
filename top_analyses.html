@@ -58,13 +58,23 @@
             background: white; border-radius: 12px; overflow: hidden;
             box-shadow: 0 2px 4px rgba(0,0,0,0.05); border: 1px solid #e5e7eb;
             display: flex; flex-direction: column;
+            position: relative;
         }
-        .analysis-img { width: 100%; height: 200px; object-fit: cover; background: #eee; }
+        .analysis-img-container {
+            position: relative;
+            width: 100%;
+            height: 200px;
+        }
+        .analysis-img { width: 100%; height: 100%; object-fit: cover; background: #eee; }
         .analysis-content { padding: 20px; flex-grow: 1; display: flex; flex-direction: column; }
         .number-badge {
-            background: var(--brand-color); color: white; padding: 4px 12px;
-            border-radius: 20px; font-size: 12px; font-weight: bold; display: inline-block;
-            margin-bottom: 10px; align-self: flex-start;
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: var(--brand-color); color: white; padding: 6px 14px;
+            border-radius: 20px; font-size: 13px; font-weight: bold;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+            z-index: 5;
         }
         .analysis-title { font-weight: bold; font-size: 18px; margin: 0 0 10px 0; }
         .analysis-desc { font-size: 14px; color: var(--text-muted); margin: 0 0 15px 0; flex-grow: 1; }
@@ -121,9 +131,11 @@
             data.forEach(item => {
                 container.innerHTML += `
                     <div class="analysis-card">
-                        ${item.image_url ? `<img src="${item.image_url}" class="analysis-img">` : '<div class="analysis-img"></div>'}
-                        <div class="analysis-content">
+                        <div class="analysis-img-container">
+                            ${item.image_url ? `<img src="${item.image_url}" class="analysis-img">` : '<div class="analysis-img" style="height: 100%;"></div>'}
                             <span class="number-badge">Opción #${item.number}</span>
+                        </div>
+                        <div class="analysis-content">
                             <h3 class="analysis-title">${item.name}</h3>
                             <p class="analysis-desc">${item.description}</p>
                             <p class="analysis-price">${item.price}</p>
