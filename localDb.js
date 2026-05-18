@@ -215,11 +215,11 @@ async function getAnalyticsStats() {
     // Total de consultas entregadas (status_id = 2) o realizadas
     const totalQuotes = await db.get('SELECT COUNT(*) as count FROM analyses_logs WHERE status_id = 2');
     
-    // Códigos de barras / exámenes más consultados (Top 10)
+    // Análisis más agendados (Top 10)
     const topProducts = await db.all(`
-        SELECT barcode as descrip, COUNT(*) as count 
-        FROM analyses_logs 
-        GROUP BY barcode 
+        SELECT analysis_name as descrip, COUNT(*) as count 
+        FROM agenda 
+        GROUP BY analysis_name 
         ORDER BY count DESC 
         LIMIT 10
     `);
