@@ -389,9 +389,9 @@ async function processMessage(sock, from, phone, text, pushName = 'desconocido',
       }
     }
 
-    const logoPath = path.join(__dirname, '../lab.webp');
+    const logoPath = path.join(__dirname, '../lab.jpg');
     if (fs.existsSync(logoPath)) {
-      await reply({ type: 'image', url: dryRun ? '/lab.webp' : logoPath, text: `*Laboratorio Clínico Integral* 🏥` });
+      await reply({ type: 'image', url: dryRun ? '/lab.jpg' : logoPath, text: `*Laboratorio Clínico Integral* 🏥` });
     } else {
       await reply({ type: 'text', text: `*Laboratorio Clínico Integral* 🏥` });
     }
@@ -418,7 +418,7 @@ async function processMessage(sock, from, phone, text, pushName = 'desconocido',
 
     if (clientName) {
       session.state = 'waiting_code';
-      await reply({ type: 'text', text: `Indica tu código de análisis, escribe *AGENDAR* para pedir una cita, o *VER* para revisar nuestros servicios:` });
+      await reply({ type: 'text', text: `Indica tu *Código de análisis*, escribe *AGENDAR* para pedir una cita, o *VER* para revisar nuestros servicios:` });
     } else {
       session.state = 'asking_name';
       await reply({ type: 'text', text: `Para poder brindarte un mejor servicio, ¿cuál es tu nombre y apellido?` });

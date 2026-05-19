@@ -49,9 +49,9 @@ const upload = multer({ storage: storage });
 // RUTAS DE VISTAS (HTML)
 // ==========================================
 
-// Servir lab.png para el simulador y vistas si existe
-app.get('/lab.webp', (req, res) => {
-  const logoPath = path.join(__dirname, 'lab.webp');
+// Servir lab.jpg para el simulador y vistas si existe
+app.get('/lab.jpg', (req, res) => {
+  const logoPath = path.join(__dirname, 'lab.jpg');
   if (fs.existsSync(logoPath)) {
     res.sendFile(logoPath);
   } else {
