@@ -129,6 +129,10 @@
             container.innerHTML = '';
             
             data.forEach(item => {
+                // store item for editing
+                window._analysesMap = window._analysesMap || {};
+                window._analysesMap[item.id] = item;
+
                 container.innerHTML += `
                     <div class="analysis-card">
                         <div class="analysis-img-container">
@@ -139,11 +143,52 @@
                             <h3 class="analysis-title">${item.name}</h3>
                             <p class="analysis-desc">${item.description}</p>
                             <p class="analysis-price">${item.price}</p>
-                            <button class="btn btn-danger" onclick="deleteAnalysis(${item.id})">Eliminar</button>
+                            <div style="display:flex; gap:8px;">
+                              <button class="btn" onclick="openEditModal(${item.id})">Editar</button>
+                              <button class="btn btn-danger" onclick="deleteAnalysis(${item.id})">Eliminar</button>
+                            </div>
                         </div>
                     </div>
                 `;
             });
+        }
+
+        // Edit modal
+        function openEditModal(id) {
+            const item = window._analysesMap && window._analysesMap[id];
+            if (!item) return alert('Análisis no encontrado');
+            document.getElementById('edit_id').value = item.id;
+            document.getElementById('edit_number').value = item.number;
+            document.getElementById('edit_name').value = item.name;
+            document.getElementById('edit_description').value = item.description;
+            document.getElementById('edit_price').value = item.price;
+            document.getElementById('edit_image_preview').src = item.image_url || '';
+            document.getElementById('editModal').style.display = 'flex';
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').style.display = 'none';
+        }
+
+        async function submitEditForm(e) {
+            e.preventDefault();
+            const id = document.getElementById('edit_id').value;
+            const formData = new FormData();
+            formData.append('number', document.getElementById('edit_number').value);
+            formData.append('name', document.getElementById('edit_name').value);
+            formData.append('description', document.getElementById('edit_description').value);
+            formData.append('price', document.getElementById('edit_price').value);
+            const file = document.getElementById('edit_image').files[0];
+            if (file) formData.append('image', file);
+
+            const res = await fetch('/api/top-analyses/' + id, { method: 'POST', body: formData });
+            if (res.ok) {
+                closeEditModal();
+                loadAnalyses();
+            } else {
+                const err = await res.json();
+                alert('Error al actualizar: ' + (err.error || 'Desconocido'));
+            }
         }
 
         document.getElementById('addForm').addEventListener('submit', async (e) => {
@@ -182,5 +227,40 @@
 
         loadAnalyses();
     </script>
+    
+    <!-- Edit Modal -->
+    <div id="editModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; z-index:50;">
+        <div style="background:white; padding:20px; border-radius:12px; width:90%; max-width:600px;">
+            <h3>Editar Análisis</h3>
+            <form id="editForm" onsubmit="submitEditForm(event)">
+                <input type="hidden" id="edit_id">
+                <div class="form-group">
+                    <label>Número</label>
+                    <input type="number" id="edit_number" required>
+                </div>
+                <div class="form-group">
+                    <label>Nombre</label>
+                    <input type="text" id="edit_name" required>
+                </div>
+                <div class="form-group">
+                    <label>Descripción</label>
+                    <textarea id="edit_description" rows="3" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Precio</label>
+                    <input type="text" id="edit_price" required>
+                </div>
+                <div class="form-group">
+                    <label>Imagen (opcional)</label>
+                    <input type="file" id="edit_image" accept="image/*">
+                    <img id="edit_image_preview" src="" alt="preview" style="width:100%; max-height:160px; object-fit:cover; margin-top:8px; display:block;">
+                </div>
+                <div style="display:flex; gap:8px;">
+                    <button type="submit" class="btn">Guardar cambios</button>
+                    <button type="button" class="btn btn-danger" onclick="closeEditModal()">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
 </body>
 </html>

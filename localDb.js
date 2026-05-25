@@ -74,6 +74,7 @@ async function getLocalDb() {
                     schedule_text TEXT,
                     schedule_date TEXT,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    attended INTEGER DEFAULT 0,
                     FOREIGN KEY (client_phone) REFERENCES clients(phone)
                 );
             `);
@@ -81,6 +82,12 @@ async function getLocalDb() {
             // Migración segura para bases de datos existentes
             try {
                 await db.exec('ALTER TABLE agenda ADD COLUMN schedule_date TEXT;');
+            } catch (e) {
+                // Columna ya existe
+            }
+            // Añadir columna 'attended' si no existe
+            try {
+                await db.exec('ALTER TABLE agenda ADD COLUMN attended INTEGER DEFAULT 0;');
             } catch (e) {
                 // Columna ya existe
             }
@@ -191,12 +198,17 @@ async function deleteTopAnalysis(id) {
     await db.run('DELETE FROM top_analyses WHERE id = ?', [id]);
 }
 
+async function updateTopAnalysis(id, number, name, description, price, image_url) {
+    const db = await getLocalDb();
+    await db.run('UPDATE top_analyses SET number = ?, name = ?, description = ?, price = ?, image_url = ? WHERE id = ?', [number, name, description, price, image_url, id]);
+}
+
 // ========================
 // Módulo de Agenda
 // ========================
 async function addAgenda(client_phone, analysis_name, schedule_text, schedule_date) {
     const db = await getLocalDb();
-    await db.run('INSERT INTO agenda (client_phone, analysis_name, schedule_text, schedule_date) VALUES (?, ?, ?, ?)', [client_phone, analysis_name, schedule_text, schedule_date]);
+    await db.run('INSERT INTO agenda (client_phone, analysis_name, schedule_text, schedule_date, attended) VALUES (?, ?, ?, ?, 0)', [client_phone, analysis_name, schedule_text, schedule_date]);
 }
 
 async function getAllAgendas() {
@@ -207,6 +219,25 @@ async function getAllAgendas() {
         LEFT JOIN clients c ON a.client_phone = c.phone 
         ORDER BY a.created_at DESC
     `);
+}
+
+async function getPendingAgendas(limit = 20, offset = 0) {
+    const db = await getLocalDb();
+    const items = await db.all(`
+        SELECT a.id, a.client_phone, c.name as client_name, a.analysis_name, a.schedule_text, a.schedule_date, a.created_at
+        FROM agenda a
+        LEFT JOIN clients c ON a.client_phone = c.phone
+        WHERE a.attended = 0
+        ORDER BY a.schedule_date ASC, a.created_at ASC
+        LIMIT ? OFFSET ?
+    `, [limit, offset]);
+    const countRow = await db.get('SELECT COUNT(*) as count FROM agenda WHERE attended = 0');
+    return { items, total: countRow.count };
+}
+
+async function markAgendaAttended(id) {
+    const db = await getLocalDb();
+    await db.run('UPDATE agenda SET attended = 1 WHERE id = ?', [id]);
 }
 
 async function getAgendasByDate(dateStr) {
@@ -281,7 +312,10 @@ module.exports = {
     getAllTopAnalyses,
     getTopAnalysisByNumber,
     deleteTopAnalysis,
+    updateTopAnalysis,
     addAgenda,
+    getPendingAgendas,
+    markAgendaAttended,
     getAllAgendas,
     getAgendasByDate,
     deleteAgenda,

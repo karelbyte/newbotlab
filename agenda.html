@@ -82,22 +82,28 @@
                     <!-- Items generados dinámicamente -->
                 </tbody>
             </table>
+            <div id="pager" style="display:flex; align-items:center; gap:8px; margin-top:12px;"></div>
         </div>
     </div>
 
     <script>
-        async function loadAgenda() {
-            const res = await fetch('/api/agenda');
+        let currentPage = 1;
+        const pageSize = 20;
+
+        async function loadAgenda(page = 1) {
+            currentPage = page;
+            const res = await fetch(`/api/agenda?pending=true&page=${page}&pageSize=${pageSize}`);
             const data = await res.json();
             const container = document.getElementById('agendaList');
             container.innerHTML = '';
-            
-            if (data.length === 0) {
-                container.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #6b7280;">No hay citas agendadas.</td></tr>';
+
+            if (!data.items || data.items.length === 0) {
+                container.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #6b7280;">No hay citas pendientes.</td></tr>';
+                renderPagination(0);
                 return;
             }
 
-            data.forEach(item => {
+            data.items.forEach(item => {
                 const date = new Date(item.created_at).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' });
                 container.innerHTML += `
                     <tr>
@@ -106,20 +112,49 @@
                         <td>${item.client_phone}</td>
                         <td><span class="badge">${item.analysis_name}</span></td>
                         <td style="font-weight: bold; color: #00509D;">${item.schedule_text}</td>
-                        <td><button class="btn-danger" onclick="deleteAgenda(${item.id})">Marcar Atendida</button></td>
+                        <td><button class="btn-danger" onclick="attendAgenda(${item.id})">Marcar Atendida</button></td>
                     </tr>
                 `;
             });
+
+            renderPagination(data.total || 0);
         }
 
-        async function deleteAgenda(id) {
-            if(confirm('¿Seguro que deseas marcar esta cita como atendida y borrarla de la lista?')) {
-                await fetch('/api/agenda/' + id, { method: 'DELETE' });
-                loadAgenda();
+        async function attendAgenda(id) {
+            if (confirm('¿Confirmas que la cita fue atendida? Esto la marcará como atendida y no la mostrará en la lista de pendientes.')) {
+                await fetch('/api/agenda/' + id + '/attend', { method: 'POST' });
+                loadAgenda(currentPage);
             }
         }
 
-        loadAgenda();
+        function renderPagination(total) {
+            const pager = document.getElementById('pager');
+            if (!pager) return;
+            pager.innerHTML = '';
+            const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+            const prevBtn = document.createElement('button');
+            prevBtn.className = 'btn';
+            prevBtn.innerText = '« Anterior';
+            prevBtn.disabled = currentPage <= 1;
+            prevBtn.onclick = () => loadAgenda(currentPage - 1);
+
+            const nextBtn = document.createElement('button');
+            nextBtn.className = 'btn';
+            nextBtn.innerText = 'Siguiente »';
+            nextBtn.disabled = currentPage >= totalPages;
+            nextBtn.onclick = () => loadAgenda(currentPage + 1);
+
+            const info = document.createElement('span');
+            info.style.margin = '0 10px';
+            info.innerText = `Página ${currentPage} de ${totalPages} · ${total} pendientes`;
+
+            pager.appendChild(prevBtn);
+            pager.appendChild(info);
+            pager.appendChild(nextBtn);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => loadAgenda(1));
     </script>
 </body>
 </html>

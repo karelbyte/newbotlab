@@ -3,7 +3,8 @@ const axios = require('axios');
 const { rmSync, existsSync } = require('fs');
 const path = require('path');
 const os = require('os');
-const { sendErrorEmail, sendNotificationEmail } = require('../errorNotifier.js');
+const { sendErrorEmail } = require('../errorNotifier.js');
+const { sendAppointmentEmail } = require('../mailer.js');
 const fs = require('fs');
 const { readdirSync, statSync, unlinkSync } = require('fs');
 const v8 = require('v8');
@@ -362,8 +363,24 @@ async function processMessage(sock, from, phone, text, pushName = 'desconocido',
       
       if (!dryRun) {
         await db.addAgenda(phone, session.selectedAnalysisName, scheduleText, scheduleDate);
+
+        // Intentar notificar por correo al laboratorio sobre la nueva cita
+        try {
+          const client = await db.getUser(phone);
+          const clientName = client?.name || 'Paciente';
+          const subject = 'Nueva cita agendada';
+          const message = `Se ha agendado una nueva cita:\n\nPaciente: ${clientName}\nTeléfono: ${phone}\nAnálisis: ${session.selectedAnalysisName}\nFecha y hora: ${scheduleText}`;
+          const details = `schedule_date=${scheduleDate}`;
+
+          // Ignorar horario de oficina para notificar inmediatamente
+          await sendAppointmentEmail(subject, message, details).catch(err => {
+            console.error('Error enviando email de confirmación de cita:', err);
+          });
+        } catch (err) {
+          console.error('Error preparando o enviando email de cita:', err);
+        }
       }
-      
+
       session.state = 'waiting_code';
       await reply({ type: 'text', text: `✅ ¡Tu cita ha sido agendada exitosamente para el ${scheduleText}!\nTe esperamos en laboratorio.\n\nSi necesitas consultar resultados, indica tu código de análisis.` });
     } else {

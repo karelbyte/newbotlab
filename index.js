@@ -480,13 +480,59 @@ app.delete('/api/top-analyses/:id', async (req, res) => {
   }
 });
 
+// Actualizar análisis top (editar)
+app.post('/api/top-analyses/:id', upload.single('image'), async (req, res) => {
+  try {
+    const id = req.params.id;
+    const { number, name, description, price } = req.body;
+
+    // Obtener registro existente para preservar image_url si no suben nueva imagen
+    const dbConn = await db.getLocalDb();
+    const existing = await dbConn.get('SELECT * FROM top_analyses WHERE id = ?', [id]);
+    if (!existing) return res.status(404).json({ error: 'Análisis no encontrado' });
+
+    const imageUrl = req.file ? `/promos_imgs/${req.file.filename}` : existing.image_url;
+
+    // Usar helper del módulo si existe
+    if (typeof db.updateTopAnalysis === 'function') {
+      await db.updateTopAnalysis(id, number, name, description, price, imageUrl);
+    } else {
+      await dbConn.run('UPDATE top_analyses SET number = ?, name = ?, description = ?, price = ?, image_url = ? WHERE id = ?', [number, name, description, price, imageUrl, id]);
+    }
+
+    res.sendStatus(200);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ==========================================
 // APIS DE AGENDA (SQLITE CRUD)
 // ==========================================
 app.get('/api/agenda', async (req, res) => {
   try {
+    const pending = req.query.pending === 'true' || false;
+    const page = Math.max(1, parseInt(req.query.page || '1'));
+    const pageSize = Math.max(1, parseInt(req.query.pageSize || '20'));
+
+    if (pending) {
+      const offset = (page - 1) * pageSize;
+      const result = await db.getPendingAgendas(pageSize, offset);
+      return res.json({ items: result.items, total: result.total, page, pageSize });
+    }
+
     const agendas = await db.getAllAgendas();
     res.json(agendas);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Marcar una cita como atendida (no borrar) — para estadísticas
+app.post('/api/agenda/:id/attend', async (req, res) => {
+  try {
+    await db.markAgendaAttended(req.params.id);
+    res.sendStatus(200);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
