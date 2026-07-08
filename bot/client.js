@@ -3,8 +3,6 @@ const axios = require('axios');
 const { rmSync, existsSync } = require('fs');
 const path = require('path');
 const os = require('os');
-const { sendErrorEmail } = require('../errorNotifier.js');
-const { sendAppointmentEmail } = require('../mailer.js');
 const fs = require('fs');
 const { readdirSync, statSync, unlinkSync } = require('fs');
 const v8 = require('v8');
@@ -372,10 +370,8 @@ async function processMessage(sock, from, phone, text, pushName = 'desconocido',
           const message = `Se ha agendado una nueva cita:\n\nPaciente: ${clientName}\nTeléfono: ${phone}\nAnálisis: ${session.selectedAnalysisName}\nFecha y hora: ${scheduleText}`;
           const details = `schedule_date=${scheduleDate}`;
 
-          // Ignorar horario de oficina para notificar inmediatamente
-          await sendAppointmentEmail(subject, message, details).catch(err => {
-            console.error('Error enviando email de confirmación de cita:', err);
-          });
+          // Log de confirmación de cita (sin envío de email)
+          console.log(`[CITA CONFIRMADA] Teléfono: ${phoneNumber}, Fecha: ${scheduleText}, Detalles: ${details}`);
         } catch (err) {
           console.error('Error preparando o enviando email de cita:', err);
         }
@@ -556,9 +552,6 @@ async function handleCodeQuery(sock, from, phone, code, reply, dryRun) {
     }
   } catch (err) {
     console.error('[BOT] Error al procesar código en API:', err.message);
-    if (!dryRun) {
-      await sendErrorEmail(`Error procesando código ${code}`, err).catch(() => {});
-    }
     await reply({ type: 'text', text: `⚠️ Error consultando resultados. Intenta más tarde.` });
   } finally {
     if (!dryRun && sock) {
@@ -654,13 +647,9 @@ async function startBot() {
         if (qr) {
           botState.qr = qr;
           botState.connected = false;
-          console.log('Nuevo QR generado');
+          console.log('[QR] Nuevo código QR generado');
           if (!botState.hasConnected && canSendNotification('qr_notification')) {
-            await sendNotificationEmail(
-              'Bot WhatsApp requiere escaneo QR',
-              'Se ha generado un nuevo QR porque la sesión no está activa o la sesión anterior fue invalidada.',
-              `Estado de conexión: ${connection}`
-            ).catch(err => console.error('Error enviando notificación de QR:', err));
+            console.log('[QR] Sesión no conectada, requiere escaneo de QR por el administrador');
           }
         }
         if (connection === 'close') {
@@ -679,13 +668,9 @@ async function startBot() {
               console.error('Se alcanzó el límite máximo de intentos de reconexión.');
             }
             if (!botState.hasConnected && canSendNotification(QR_NOTIFICATION_THROTTLE_KEY)) {
-              await sendNotificationEmail(
-                'Bot WhatsApp requiere nuevo escaneo QR',
-                'La sesión fue cerrada por WhatsApp y se borrará la sesión local para generar un nuevo QR.',
-                `Código de cierre: ${statusCode}`
-              ).catch(err => console.error('Error enviando notificación de reconexión con QR:', err));
+              console.log('[QR] Sesión cerrada por WhatsApp, se generará nuevo QR');
             }
-            console.log('Sesión cerrada por el usuario, limpiando sesión...');
+            console.log('[SESSION] Sesión cerrada por el usuario, limpiando sesión...');
             botState.qr = null;
             botState.hasConnected = false;
             if (existsSync(SESSION_PATH)) {
@@ -704,8 +689,7 @@ async function startBot() {
           console.log('Bot conectado a WhatsApp');
         }
       } catch (err) {
-        console.error('Error en connection.update:', err);
-        await sendErrorEmail('Error en connection.update', err).catch(emailErr => console.error('Error enviando email:', emailErr));
+        console.error('[CONNECTION ERROR]', err);
       }
     });
 
@@ -713,17 +697,39 @@ async function startBot() {
       try {
         await saveCreds(creds);
       } catch (err) {
-        console.error('Error guardando credenciales:', err);
-        await sendErrorEmail('Error guardando credenciales', err).catch(emailErr => console.error('Error enviando email:', emailErr));
+        console.error('[CREDS ERROR] Error guardando credenciales:', err);
       }
     });
 
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
       try {
-        if (type !== 'notify') return;
+        // ── DIAGNÓSTICO 1: ¿Llega el evento a Baileys? ──
+        console.log(`[DIAG] messages.upsert disparado | type="${type}" | cantidad de mensajes: ${messages.length}`);
+
+        if (type !== 'notify') {
+          console.log(`[DIAG] Ignorado: type="${type}" no es "notify"`);
+          return;
+        }
 
         for (const msg of messages) {
-          if (!msg.message || msg.key.fromMe) continue;
+          // ── DIAGNÓSTICO 2: Estructura cruda del mensaje ──
+          console.log(`[DIAG] Mensaje crudo recibido:`, JSON.stringify({
+            fromMe: msg.key?.fromMe,
+            remoteJid: msg.key?.remoteJid,
+            senderPn: msg.key?.senderPn,
+            pushName: msg.pushName,
+            messageType: msg.message ? Object.keys(msg.message) : null,
+            status: msg.status
+          }));
+
+          if (!msg.message) {
+            console.log('[DIAG] Ignorado: msg.message está vacío (sin contenido)');
+            continue;
+          }
+          if (msg.key.fromMe) {
+            console.log('[DIAG] Ignorado: mensaje enviado por el propio bot (fromMe=true)');
+            continue;
+          }
 
           const from = msg.key.remoteJid;
           const phone = (msg.key.senderPn || from)
@@ -732,7 +738,7 @@ async function startBot() {
             .replace('@lid', '');
 
           const name = msg.pushName || 'desconocido';
-          console.log(`Mensaje recibido de: +${phone} (${name})`);
+          console.log(`[DIAG] Procesando mensaje de: +${phone} (${name}) | JID: ${from}`);
 
           const text =
             msg.message.conversation ||
@@ -741,24 +747,31 @@ async function startBot() {
             msg.message?.documentMessage?.caption ||
             '';
 
-          console.log('[BOT] texto recibido:', text);
+          // ── DIAGNÓSTICO 3: ¿Se extrajo texto? ──
+          console.log(`[DIAG] Texto extraído: "${text}" | Tipo de mensaje detectado: ${
+            msg.message.conversation ? 'conversation' :
+            msg.message.extendedTextMessage ? 'extendedText' :
+            msg.message.imageMessage ? 'image' :
+            msg.message.documentMessage ? 'document' :
+            'DESCONOCIDO - keys: ' + Object.keys(msg.message).join(', ')
+          }`);
 
           if (!text) {
-            console.log('[BOT] Mensaje ignorado por no contener texto reconocible.');
+            console.log('[DIAG] Ignorado: no se pudo extraer texto del mensaje.');
             continue;
           }
 
-          // Invocar el procesador unificado con SQLite
+          // ── DIAGNÓSTICO 4: Entrando a processMessage ──
+          console.log(`[DIAG] Llamando processMessage para +${phone} con texto: "${text}"`);
           await processMessage(sock, from, phone, text, name, false);
+          console.log(`[DIAG] processMessage completado para +${phone}`);
         }
       } catch (err) {
-        console.error('Error manejando mensaje de WhatsApp:', err);
-        await sendErrorEmail('Error manejando mensaje de WhatsApp', err).catch(emailErr => console.error('Error enviando email:', emailErr));
+        console.error('[MESSAGES ERROR] Error manejando mensaje de WhatsApp:', err);
       }
     });
   } catch (err) {
-    console.error('Error inicializando bot:', err);
-    await sendErrorEmail('Error inicializando bot', err).catch(emailErr => console.error('Error enviando email:', emailErr));
+    console.error('[BOT STARTUP ERROR]', err);
     scheduleBotRestart(30000);
   }
 }

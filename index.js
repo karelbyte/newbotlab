@@ -5,7 +5,6 @@ const path = require('path');
 const multer = require('multer');
 const fs = require('fs');
 const { startBot, botState, processMessage, userSessions, sendBroadcast, getSockInstance } = require('./bot/client.js');
-const { sendErrorEmail } = require('./errorNotifier.js');
 const db = require('./localDb.js');
 
 const IGNORE_TIMEOUT_UNHANDLED_REJECTIONS = !['false', '0', 'no', 'off'].includes(String(process.env.IGNORE_TIMEOUT_UNHANDLED_REJECTIONS || 'true').toLowerCase());
@@ -605,14 +604,12 @@ app.post('/chat', async (req, res) => {
 // ==========================================
 
 app.use((err, req, res, next) => {
-  console.error('Express error:', err);
-  void sendErrorEmail('Express error', err);
+  console.error('[EXPRESS ERROR]', err);
   res.status(500).json({ error: 'Ocurrió un error en el servidor' });
 });
 
 process.on('uncaughtException', err => {
-  console.error('uncaughtException:', err);
-  void sendErrorEmail('uncaughtException', err);
+  console.error('[UNCAUGHT EXCEPTION]', err);
   process.exit(1);
 });
 
@@ -631,20 +628,15 @@ function shouldReportUnhandledRejection(reason) {
 }
 
 process.on('unhandledRejection', reason => {
-  console.error('unhandledRejection:', reason);
+  console.error('[UNHANDLED REJECTION]', reason);
   const error = reason instanceof Error ? reason : new Error(String(reason));
 
   if (!shouldReportUnhandledRejection(reason)) {
     return;
   }
 
-  const now = Date.now();
-  if (!global.lastUnhandledRejectionEmail || now - global.lastUnhandledRejectionEmail > 60 * 60 * 1000) { // 1 hour
-    global.lastUnhandledRejectionEmail = now;
-    void sendErrorEmail('Unhandled rejection', error);
-  } else {
-    console.log('[THROTTLE] Unhandled rejection email throttled');
-  }
+  // Loguear error crítico (sin envío de email)
+  console.error('[CRITICAL] Error no manejado que requiere atención:', error.message);
 });
 
 // ==========================================
@@ -656,6 +648,5 @@ app.listen(PORT, () => {
 });
 
 startBot().catch(err => {
-  console.error('Error iniciando bot:', err);
-  void sendErrorEmail('Error inicializando bot', err);
+  console.error('[BOT STARTUP ERROR]', err);
 });
