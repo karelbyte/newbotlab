@@ -732,13 +732,17 @@ async function startBot() {
           }
 
           const from = msg.key.remoteJid;
+          // Si el JID es @lid (ID de dispositivo vinculado), usar senderPn para responder
+          // Los mensajes enviados a @lid no son entregados por WhatsApp
+          const replyJid = msg.key.senderPn || from;
+
           const phone = (msg.key.senderPn || from)
             .replace('@s.whatsapp.net', '')
             .replace('@g.us', '')
             .replace('@lid', '');
 
           const name = msg.pushName || 'desconocido';
-          console.log(`[DIAG] Procesando mensaje de: +${phone} (${name}) | JID: ${from}`);
+          console.log(`[DIAG] Procesando mensaje de: +${phone} (${name}) | JID original: ${from} | JID respuesta: ${replyJid}`);
 
           const text =
             msg.message.conversation ||
@@ -763,7 +767,7 @@ async function startBot() {
 
           // ── DIAGNÓSTICO 4: Entrando a processMessage ──
           console.log(`[DIAG] Llamando processMessage para +${phone} con texto: "${text}"`);
-          await processMessage(sock, from, phone, text, name, false);
+          await processMessage(sock, replyJid, phone, text, name, false);
           console.log(`[DIAG] processMessage completado para +${phone}`);
         }
       } catch (err) {
