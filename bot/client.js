@@ -24,7 +24,144 @@ if (!fs.existsSync(SESSION_PATH)) {
 
 const API_URL = process.env.API_URL || 'https://storelab.laboratorioclinicointegral.com/api';
 
-const GREETINGS = ['hola', 'saludos', 'buenas', 'buenos dias', 'buenas tardes', 'buenas noches', 'hey', 'hi', 'hello'];
+const GREETINGS = ['hola', 'saludos', 'buenas', 'buen dia', 'buen día', 'buenos dias', 'buenos días', 'buenas tardes', 'buenas noches', 'hey', 'hi', 'hello', 'que tal', 'qué tal', 'que onda', 'qué onda', 'como estas', 'cómo estás', 'como esta', 'cómo está', 'buenass', 'buenas', 'holi', 'holis', 'ola', 'alo', 'aló'];
+
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+const R = {
+  header: [
+    `*Laboratorio Clínico Integral* 🏥`,
+    `🏥 *Laboratorio Clínico Integral*`,
+    `Bienvenido a *Laboratorio Clínico Integral* 🏥`,
+  ],
+  askName: [
+    `Para poder brindarte un mejor servicio, ¿cuál es tu nombre y apellido?`,
+    `¿Me podrías decir tu nombre completo para registrarte?`,
+    `Primero, ¿cómo te llamas? (nombre y apellido)`,
+    `Para empezar, ¿me compartes tu nombre completo?`,
+    `Dime tu nombre y apellido para poder atenderte mejor.`,
+  ],
+  thanksRegister: (name) => pick([
+    `¡Gracias *${name}*! Te hemos registrado en nuestro sistema.`,
+    `Perfecto *${name}*, ya quedaste registrado en nuestro sistema.`,
+    `*${name}*, ¡listo! Ya te tenemos en nuestro sistema.`,
+    `Registrado con éxito *${name}*. Bienvenido a Laboratorio Clínico Integral.`,
+  ]),
+  mainMenu: [
+    `Indica tu *Código de análisis*, escribe *AGENDAR* para pedir una cita, o *VER* para revisar nuestros servicios:`,
+    `Puedes escribir tu *código de análisis*, *AGENDAR* una cita, o *VER* nuestros servicios:`,
+    `¿Qué deseas hacer? Ingresa tu código de resultados, *AGENDAR* una cita, o *VER* análisis disponibles:`,
+    `Envía tu *código de análisis*, escribe *AGENDAR* para citas, o *VER* para ver servicios:`,
+  ],
+  askAgendaName: [
+    `¿Para qué análisis o estudio médico te gustaría agendar tu cita? (ej: Perfil Tiroideo, Glucosa, etc.) o escribe el número de la opción del catálogo.\n\nSi deseas cancelar escribe *no*.`,
+    `¿Qué estudio o análisis deseas realizarte? Puedes escribir el nombre (ej: Perfil Tiroideo) o el número del catálogo.\n\nSi deseas cancelar escribe *no*.`,
+    `Dime el nombre del análisis que te gustaría agendar, o el número de la opción del catálogo.\n\nPara cancelar escribe *no*.`,
+  ],
+  noCatalog: [
+    `Por el momento no tenemos análisis destacados en catálogo. Ingresa tu código de barras o escribe *AGENDAR*:`,
+    `Aún no hay análisis destacados disponibles. Puedes ingresar tu código de resultados o escribir *AGENDAR*:`,
+  ],
+  catalogHeader: [
+    `📋 *Catálogo de Análisis Top*:\nAquí tienes nuestros análisis más solicitados:`,
+    `📋 *Análisis Más Solicitados*:\nEstos son los estudios que nuestros pacientes más piden:`,
+    `📋 *Nuestros Análisis Destacados*:\nEcha un vistazo a los servicios más populares:`,
+  ],
+  catalogFooter: [
+    `Si te interesa alguno de estos o buscas otro estudio, escribe *AGENDAR* para pedir una cita, o ingresa tu código de resultados.`,
+    `¿Te interesa alguno? Escribe *AGENDAR* para apartar tu cita, o ingresa tu código de resultados.`,
+    `Para agendar cualquiera de estos estudios escribe *AGENDAR*, o ingresa tu código de resultados.`,
+  ],
+  cancelBack: [
+    `Entendido. Indica tu *Código de análisis*, escribe *AGENDAR* o *VER*:`,
+    `De acuerdo. Puedes escribir tu *código de análisis*, *AGENDAR* o *VER*:`,
+    `Ok. Ingresa tu *código de análisis*, *AGENDAR* para citas, o *VER*:`,
+  ],
+  askDay: (name) => pick([
+    `Excelente elección: *${name}*.\n\nPara agendar tu cita, dime primero: ¿Qué **día** deseas venir? (Escribe solo el número del día, ej: 23)`,
+    `*${name}*, excelente. ¿Qué **día** te gustaría venir? (Solo el número, ej: 15)`,
+    `Perfecto, *${name}*. Dime el **día** en que deseas tu cita (ej: 23):`,
+  ]),
+  invalidDay: [
+    `Por favor ingresa un número de día válido (del 1 al 31).`,
+    `Ese día no es válido. Ingresa un número entre 1 y 31.`,
+    `Día inválido. Recuerda escribir solo el número del día (1 al 31).`,
+  ],
+  askTime: (day, month) => pick([
+    `Perfecto, será el ${day} de ${month}.\n\nAhora dime: ¿A qué **hora** te gustaría asistir? (ej: 9:20 am, o 4:00 pm)`,
+    `El ${day} de ${month} está disponible. ¿A qué **hora** prefieres tu cita? (ej: 10:30 am)`,
+    `Entendido, ${day} de ${month}. ¿A qué **hora** te gustaría pasar? (ej: 9:00 am)`,
+  ]),
+  confirmAppointment: (analysis, day, month, time) => pick([
+    `Resumen de tu cita:\n🧬 Análisis: *${analysis}*\n📅 Fecha: *${day} de ${month}*\n🕒 Hora: *${time}*\n\n¿Confirmas esta cita? (Responde *si* o *no*)`,
+    `Confirma tus datos:\n🧬 *${analysis}*\n📅 ${day} de ${month}\n🕒 ${time}\n\n¿Todo está correcto? (*si* / *no*)`,
+    `Revisa tu cita:\n🧬 Análisis: *${analysis}*\n📅 Fecha: ${day} de ${month}\n🕒 Hora: ${time}\n\n¿Confirmas? (*si* o *no*)`,
+  ]),
+  appointmentConfirmed: (schedule) => pick([
+    `✅ ¡Tu cita ha sido agendada exitosamente para el ${schedule}!\nTe esperamos en laboratorio.\n\nSi necesitas consultar resultados, indica tu código de análisis.`,
+    `✅ Cita confirmada para el ${schedule}.\nTe esperamos en Laboratorio Clínico Integral.\n\nPara consultar resultados, envía tu código de análisis.`,
+    `✅ ¡Listo! Te esperamos el ${schedule}.\n\nSi necesitas resultados, ingresa tu código de análisis.`,
+  ]),
+  appointmentCancelled: [
+    `Cita cancelada. Si necesitas algo más, indica tu *Código de análisis*, escribe *AGENDAR* o *VER*.`,
+    `Cancelación exitosa. Puedes escribir tu *código de análisis*, *AGENDAR* una cita, o *VER* servicios.`,
+    `Cita cancelada. ¿En qué más puedo ayudarte? Ingresa tu código, *AGENDAR* o *VER*.`,
+  ],
+  checkingCode: (code) => pick([
+    `🔍 Consultando tu código *${code}*...`,
+    `🔍 Un momento, estoy buscando el código *${code}*...`,
+    `🔍 Revisando resultados para *${code}*...`,
+  ]),
+  codeNotFound: (code) => pick([
+    `❌ No se encontró el código: *${code}*`,
+    `❌ El código *${code}* no está registrado en nuestro sistema.`,
+    `❌ No encontré resultados para *${code}*. Verifica el código e intenta de nuevo.`,
+  ]),
+  pendingPayment: [
+    `🚫 Pendiente de pago. Contacte al (755) 108 48 00.`,
+    `🚫 El resultado está pendiente de pago. Comunícate al (755) 108 48 00 para regularizar.`,
+  ],
+  resultNotReady: [
+    `⚠️ El resultado aún no está disponible. Comunícate al *(755) 108 48 00*.`,
+    `⚠️ Tu resultado todavía no está listo. Llama al (755) 108 48 00 para más información.`,
+  ],
+  resultDelivered: [
+    `✅ Resultados entregados.`,
+    `✅ Listo, ya tienes tus resultados.`,
+    `✅ Resultados enviados correctamente.`,
+  ],
+  errorGeneric: [
+    `⚠️ Error consultando resultados. Intenta más tarde.`,
+    `⚠️ Ocurrió un error al buscar tus resultados. Por favor intenta de nuevo.`,
+    `⚠️ No pudimos consultar tus resultados ahorita. Intenta más tarde.`,
+  ],
+  askAnotherCode: [
+    `¿Tienes otro código que consultar? Indícalo, escribe *AGENDAR* para pedir una cita, *VER* para revisar servicios, o *no* para terminar.`,
+    `¿Otro código? Envíalo, o escribe *AGENDAR* para citas, *VER* servicios, o *no* para salir.`,
+    `¿Necesitas consultar otro código? Escríbelo, o elige *AGENDAR*, *VER*, o *no* para terminar.`,
+  ],
+  fallback: [
+    `No reconozco ese mensaje. Envía tu *Código de análisis* o escribe *hola* para comenzar.`,
+    `Lo siento, no entendí. Puedes escribir tu *código de análisis* o *hola* para empezar.`,
+    `No comprendí ese mensaje. Intenta con tu *código de análisis* o escribe *hola*.`,
+    `¿Cómo puedo ayudarte? Puedes escribir tu *código de análisis* o *hola* para empezar.`,
+    `Disculpa, no te entendí. ¿Tienes un *código de análisis* o quieres escribir *hola* para comenzar?`,
+  ],
+  faqAyuno: [
+    `🧪 *Guía de Preparación y Ayuno* 🏥\n\nPara garantizar la precisión de tus análisis, por favor sigue estas indicaciones generales:\n\n💉 *Análisis de Sangre (Glucosa, Lípidos, Perfil Tiroideo):*\n- Requiere de **8 a 12 horas** de ayuno estricto.\n- No bebas alcohol ni fumes desde el día anterior.\n- Solo puedes beber un poco de agua simple (sin azúcar, café ni té).\n\n🧪 *Examen de Orina:*\n- Recolecta la primera orina de la mañana.\n- Usa un frasco estéril (disponible en farmacias).\n- Descarta el primer chorro y recolecta el chorro medio.\n\n🤰 *Pruebas de Embarazo (en Sangre):*\n- No requiere ayuno. Puedes realizártela a cualquier hora del día.\n\nSi tienes dudas sobre algún otro estudio específico, ¡pregúntame! 😊`,
+    `📋 *Requisitos para tus Análisis* 🏥\n\nPara obtener resultados confiables ten en cuenta:\n\n🩸 *Análisis de Sangre:*\n- **8 a 12 horas** de ayuno.\n- Sin alcohol ni tabaco desde el día anterior.\n- Solo agua simple (nada de café, té o refresco).\n\n💧 *Examen de Orina:*\n- Primera orina de la mañana.\n- Frasco estéril (en farmacias).\n- Chorro medio (descartar primero y último).\n\n🩺 *Prueba de Embarazo (sangre):*\n- Sin ayuno requerido.\n\n¿Más dudas? Estoy aquí para ayudarte 🙂`,
+    `⚕️ *Preparación para Análisis*\n\nAntes de tus estudios:\n\n🩸 *Química Sanguínea, Perfil Tiroideo, Lípidos:*\nAyuno de 8 a 12 hrs. Solo agua.\n\n🧪 *Urocultivo / Examen General de Orina:*\nPrimera orina de la mañana, frasco estéril, chorro medio.\n\n🩺 *Embarazo (sangre):*\nSin preparación especial.\n\n¡Así tus resultados serán precisos! ✅`,
+  ],
+  faqUbicacion: [
+    `📍 *Nuestra Ubicación* 🏥\n\nEstamos ubicados en:\n*Saturno 15, Zona Industrial, Zihuatanejo, Gro.*\n\n🗺️ *Google Maps:*\nhttps://maps.google.com/?q=17.6464,-101.5478\n\n🕐 Nuestro horario de atención es de Lunes a Viernes de 7:00 AM a 5:00 PM. ¡Te esperamos! 😊`,
+    `🏥 *¿Dónde estamos?*\n\nNos encuentras en:\n📍 *Saturno 15, Zona Industrial, Zihuatanejo, Gro.*\n\n📌 Abrimos Lunes a Viernes de 7:00 AM a 5:00 PM.\n\n🗺️ https://maps.google.com/?q=17.6464,-101.5478\n\n¡Te esperamos! 👋`,
+    `📍 *Laboratorio Clínico Integral*\n\nDirección:\n*Saturno 15, Zona Industrial, Zihuatanejo, Gro.*\n\n🕐 Horario: Lun-Vie 7:00am - 5:00pm\n\n🗺️ https://maps.google.com/?q=17.6464,-101.5478\n\n¡Te esperamos! 😊`,
+  ],
+  farewell: (name) => pick([
+    `Hasta luego${name} 👋\n\nGracias por contactar a *Laboratorio Clínico Integral*.\nRecuerda que estamos en:\n📍 Saturno 15, Zona Industrial, Zihuatanejo, Gro.\n🕐 Lunes a Viernes 7:00am - 5:00pm\n🌐 https://laboratorioclinicointegral.com/\n📧 contacto@laboratorioclinicointegral.com\n\n¡Que tenga un excelente día! 😊`,
+    `¡Hasta pronto${name}! 👋\n\n*Laboratorio Clínico Integral*\n📍 Saturno 15, Zona Industrial, Zihuatanejo, Gro.\n🕐 Lun-Vie 7:00am - 5:00pm\n🌐 https://laboratorioclinicointegral.com/\n\n¡Que tengas un excelente día! 😊`,
+  ]),
+};
 
 // Estados de sesión en memoria
 const userSessions = new Map();
@@ -150,6 +287,8 @@ async function processMessage(sock, from, phone, text, pushName = 'desconocido',
       responses.push(msg);
     } else if (sock) {
       try {
+        const delay = 500 + Math.random() * 2000;
+        await new Promise(r => setTimeout(r, delay));
         if (msg.type === 'text') {
           console.log(`[REPLY] Enviando texto a ${from}: "${msg.text?.substring(0, 60)}..."`);
           await sock.sendMessage(from, { text: msg.text });
@@ -228,11 +367,12 @@ async function processMessage(sock, from, phone, text, pushName = 'desconocido',
       clientName = session.name;
     }
 
+    const showLogo = Math.floor(Math.random() * 100) % 2 === 0;
     const logoPath = path.join(__dirname, '../lab.jpg');
-    if (fs.existsSync(logoPath)) {
-      await reply({ type: 'image', url: dryRun ? '/lab.jpg' : logoPath, text: `*Laboratorio Clínico Integral* 🏥` });
+    if (showLogo && fs.existsSync(logoPath)) {
+      await reply({ type: 'image', url: dryRun ? '/lab.jpg' : logoPath, text: pick(R.header) });
     } else {
-      await reply({ type: 'text', text: `*Laboratorio Clínico Integral* 🏥` });
+      await reply({ type: 'text', text: pick(R.header) });
     }
 
     const welcomePromos = await db.getActivePromotions('WELCOME');
@@ -249,17 +389,18 @@ async function processMessage(sock, from, phone, text, pushName = 'desconocido',
       greetingNotice = `⚠️ *Aviso de Horario:* Actualmente nuestras oficinas físicas están cerradas (Lun-Vie 7am-5pm). Sin embargo, nuestro sistema automático está activo 24/7 para entregarte resultados o agendar tu cita. 🤖\n\n`;
     }
 
+    const showBusinessInfo = Math.floor(Math.random() * 100) % 2 === 0;
     await reply({
       type: 'text',
-      text: `${greetingNotice}📍 Saturno 15, Zona Industrial, Zihuatanejo, Gro.\n🕐 Horario: Lunes a Viernes 7:00am - 5:00pm\n🌐 https://laboratorioclinicointegral.com/\n\n${clientName ? `Bienvenido 👋 *${clientName}*` : 'Bienvenido 👋'}`
+      text: `${greetingNotice}${showBusinessInfo ? `📍 Saturno 15, Zona Industrial, Zihuatanejo, Gro.\n🕐 Horario: Lunes a Viernes 7:00am - 5:00pm\n🌐 https://laboratorioclinicointegral.com/\n\n` : ''}${clientName ? `Bienvenido 👋 *${clientName}*` : pick(['Bienvenido 👋', '¡Bienvenido! 👋', '¡Hola! Bienvenido 👋', 'Encantados de verte 👋'])}`
     });
 
     if (clientName) {
       session.state = 'waiting_code';
-      await reply({ type: 'text', text: `Indica tu *Código de análisis*, escribe *AGENDAR* para pedir una cita, o *VER* para revisar nuestros servicios:` });
+      await reply({ type: 'text', text: pick(R.mainMenu) });
     } else {
       session.state = 'asking_name';
-      await reply({ type: 'text', text: `Para poder brindarte un mejor servicio, ¿cuál es tu nombre y apellido?` });
+      await reply({ type: 'text', text: pick(R.askName) });
     }
     return responses;
   }
@@ -268,15 +409,15 @@ async function processMessage(sock, from, phone, text, pushName = 'desconocido',
     if (['ayuno', 'requisito', 'requisitos', 'preparacion', 'prepararse'].some(k => cleanText.includes(k))) {
       await reply({
         type: 'text',
-        text: `🧪 *Guía de Preparación y Ayuno* 🏥\n\nPara garantizar la precisión de tus análisis, por favor sigue estas indicaciones generales:\n\n💉 *Análisis de Sangre (Glucosa, Lípidos, Perfil Tiroideo):*\n- Requiere de **8 a 12 horas** de ayuno estricto.\n- No bebas alcohol ni fumes desde el día anterior.\n- Solo puedes beber un poco de agua simple (sin azúcar, café ni té).\n\n🧪 *Examen de Orina:*\n- Recolecta la primera orina de la mañana.\n- Usa un frasco estéril (disponible en farmacias).\n- Descarta el primer chorro y recolecta el chorro medio.\n\n🤰 *Pruebas de Embarazo (en Sangre):*\n- No requiere ayuno. Puedes realizártela a cualquier hora del día.\n\nSi tienes dudas sobre algún otro estudio específico, ¡pregúntame! 😊`
+        text: pick(R.faqAyuno)
       });
       return responses;
     }
     
-    if (['ubicacion', 'donde estan', 'donde queda', 'mapa', 'direccion', 'dirección'].some(k => cleanText.includes(k))) {
+    if (['ubicacion', 'donde estan', 'donde queda', 'donde quedan', 'mapa', 'direccion', 'dirección', 'como llegar', 'cómo llegar'].some(k => cleanText.includes(k))) {
       await reply({
         type: 'text',
-        text: `📍 *Nuestra Ubicación* 🏥\n\nEstamos ubicados en:\n*Saturno 15, Zona Industrial, Zihuatanejo, Gro.*\n\n🗺️ *Google Maps:*\nhttps://maps.google.com/?q=17.6464,-101.5478\n\n🕐 Nuestro horario de atención es de Lunes a Viernes de 7:00 AM a 5:00 PM. ¡Te esperamos! 😊`
+        text: pick(R.faqUbicacion)
       });
       return responses;
     }
@@ -291,7 +432,7 @@ async function processMessage(sock, from, phone, text, pushName = 'desconocido',
       session.name = name;
     }
 
-    await reply({ type: 'text', text: `¡Gracias *${name}*! Te hemos registrado en nuestro sistema.` });
+    await reply({ type: 'text', text: R.thanksRegister(name) });
 
     // Inyectar banner promocional POST_NAME si existe alguno
     const postNamePromos = await db.getActivePromotions('POST_NAME');
@@ -304,7 +445,7 @@ async function processMessage(sock, from, phone, text, pushName = 'desconocido',
     }
 
     session.state = 'waiting_code';
-    await reply({ type: 'text', text: `Indica tu *Código de análisis*, escribe *AGENDAR* para pedir una cita, o *VER* para revisar nuestros servicios:` });
+    await reply({ type: 'text', text: pick(R.mainMenu) });
     return responses;
   }
 
@@ -320,25 +461,25 @@ async function processMessage(sock, from, phone, text, pushName = 'desconocido',
       const farewellName = clientName ? ` ${clientName}` : '';
       await reply({
         type: 'text',
-        text: `Hasta luego${farewellName} 👋\n\nGracias por contactar a *Laboratorio Clínico Integral*.\nRecuerda que estamos en:\n📍 Saturno 15, Zona Industrial, Zihuatanejo, Gro.\n🕐 Lunes a Viernes 7:00am - 5:00pm\n🌐 https://laboratorioclinicointegral.com/\n📧 contacto@laboratorioclinicointegral.com\n\n¡Que tenga un excelente día! 😊`
+        text: R.farewell(farewellName)
       });
       return responses;
     }
 
     if (normalizedText === 'agendar') {
       session.state = 'waiting_agenda_name';
-      await reply({ type: 'text', text: `¿Para qué análisis o estudio médico te gustaría agendar tu cita? (ej: Perfil Tiroideo, Glucosa, etc.) o escribe el número de la opción del catálogo.\n\nSi deseas cancelar escribe *no*.` });
+      await reply({ type: 'text', text: pick(R.askAgendaName) });
       return responses;
     }
 
     if (normalizedText === 'ver' || normalizedText === 'catálogo' || normalizedText === 'catalogo') {
       const topAnalyses = await db.getAllTopAnalyses();
       if (topAnalyses.length === 0) {
-        await reply({ type: 'text', text: `Por el momento no tenemos análisis destacados en catálogo. Ingresa tu código de barras o escribe *AGENDAR*:` });
+        await reply({ type: 'text', text: pick(R.noCatalog) });
         return responses;
       }
 
-      await reply({ type: 'text', text: `📋 *Catálogo de Análisis Top*:\nAquí tienes nuestros análisis más solicitados:` });
+      await reply({ type: 'text', text: pick(R.catalogHeader) });
       for (const analysis of topAnalyses) {
         const textMsg = `*Opción N° ${analysis.number}* - 🧬 *${analysis.name}*\n${analysis.description}\n💰 Precio: ${analysis.price}`;
         if (analysis.image_url) {
@@ -348,7 +489,7 @@ async function processMessage(sock, from, phone, text, pushName = 'desconocido',
         }
       }
 
-      await reply({ type: 'text', text: `Si te interesa alguno de estos o buscas otro estudio, escribe *AGENDAR* para pedir una cita, o ingresa tu código de resultados.` });
+      await reply({ type: 'text', text: pick(R.catalogFooter) });
       return responses;
     }
 
@@ -360,7 +501,7 @@ async function processMessage(sock, from, phone, text, pushName = 'desconocido',
   if (session.state === 'waiting_agenda_name') {
     if (['no', 'cancelar', 'salir'].includes(normalizedText)) {
       session.state = 'waiting_code';
-      await reply({ type: 'text', text: `Entendido. Indica tu *Código de análisis*, escribe *AGENDAR* o *VER*:` });
+      await reply({ type: 'text', text: pick(R.cancelBack) });
       return responses;
     }
 
@@ -377,7 +518,7 @@ async function processMessage(sock, from, phone, text, pushName = 'desconocido',
     }
 
     session.state = 'waiting_agenda_day';
-    await reply({ type: 'text', text: `Excelente elección: *${session.selectedAnalysisName}*.\n\nPara agendar tu cita, dime primero: ¿Qué **día** deseas venir? (Escribe solo el número del día, ej: 23)` });
+    await reply({ type: 'text', text: R.askDay(session.selectedAnalysisName) });
     return responses;
   }
 
@@ -385,7 +526,7 @@ async function processMessage(sock, from, phone, text, pushName = 'desconocido',
   if (session.state === 'waiting_agenda_day') {
     const day = parseInt(normalizedText);
     if (isNaN(day) || day < 1 || day > 31) {
-      await reply({ type: 'text', text: `Por favor ingresa un número de día válido (del 1 al 31).` });
+      await reply({ type: 'text', text: pick(R.invalidDay) });
       return responses;
     }
 
@@ -404,11 +545,12 @@ async function processMessage(sock, from, phone, text, pushName = 'desconocido',
 
     const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
     session.agendaDay = day;
+    session.agendaMonth = month;
     session.agendaMonthName = monthNames[month];
     session.agendaYear = year;
     
     session.state = 'waiting_agenda_time';
-    await reply({ type: 'text', text: `Perfecto, será el ${day} de ${session.agendaMonthName}.\n\nAhora dime: ¿A qué **hora** te gustaría asistir? (ej: 9:20 am, o 4:00 pm)` });
+    await reply({ type: 'text', text: R.askTime(day, session.agendaMonthName) });
     return responses;
   }
 
@@ -416,7 +558,7 @@ async function processMessage(sock, from, phone, text, pushName = 'desconocido',
   if (session.state === 'waiting_agenda_time') {
     session.agendaTime = text.trim();
     session.state = 'waiting_agenda_confirm';
-    await reply({ type: 'text', text: `Resumen de tu cita:\n🧬 Análisis: *${session.selectedAnalysisName}*\n📅 Fecha: *${session.agendaDay} de ${session.agendaMonthName}*\n🕒 Hora: *${session.agendaTime}*\n\n¿Confirmas esta cita? (Responde *si* o *no*)` });
+    await reply({ type: 'text', text: R.confirmAppointment(session.selectedAnalysisName, session.agendaDay, session.agendaMonthName, session.agendaTime) });
     return responses;
   }
 
@@ -448,10 +590,10 @@ async function processMessage(sock, from, phone, text, pushName = 'desconocido',
       }
 
       session.state = 'waiting_code';
-      await reply({ type: 'text', text: `✅ ¡Tu cita ha sido agendada exitosamente para el ${scheduleText}!\nTe esperamos en laboratorio.\n\nSi necesitas consultar resultados, indica tu código de análisis.` });
+      await reply({ type: 'text', text: R.appointmentConfirmed(scheduleText) });
     } else {
       session.state = 'waiting_code';
-      await reply({ type: 'text', text: `Cita cancelada. Si necesitas algo más, indica tu *Código de análisis*, escribe *AGENDAR* o *VER*.` });
+      await reply({ type: 'text', text: pick(R.appointmentCancelled) });
     }
     return responses;
   }
@@ -466,7 +608,7 @@ async function processMessage(sock, from, phone, text, pushName = 'desconocido',
   // 5. RESPUESTA POR DEFECTO
   await reply({
     type: 'text',
-    text: `No reconozco ese mensaje. Envía tu *Código de análisis* o escribe *hola* para comenzar.`
+    text: pick(R.fallback)
   });
   return responses;
 }
@@ -480,7 +622,7 @@ async function handleCodeQuery(sock, from, phone, code, reply, dryRun) {
     await sock.sendPresenceUpdate('composing', from);
   }
   
-  await reply({ type: 'text', text: `🔍 Consultando tu código *${code}*...` });
+  await reply({ type: 'text', text: R.checkingCode(code) });
 
   try {
     const response = await axios.get(`${API_URL}/get-service-by-barcode/${localPhone}/${code}`, {
@@ -490,7 +632,7 @@ async function handleCodeQuery(sock, from, phone, code, reply, dryRun) {
 
     if (!data || !data.barcode) {
       console.log('[BOT] Código no encontrado en API.');
-      await reply({ type: 'text', text: `❌ No se encontró el código: *${code}*` });
+      await reply({ type: 'text', text: R.codeNotFound(code) });
     } else {
       // Registrar log local de la consulta
       if (!dryRun) {
@@ -498,7 +640,7 @@ async function handleCodeQuery(sock, from, phone, code, reply, dryRun) {
       }
 
       if (data.status_id === 1) {
-        await reply({ type: 'text', text: `🚫 Pendiente de pago. Contacte al (755) 108 48 00.` });
+        await reply({ type: 'text', text: pick(R.pendingPayment) });
       } else if (data.status_id === 2) {
         console.log('[BOT] Resultados listos. Entregando documentos.');
 
@@ -553,7 +695,7 @@ async function handleCodeQuery(sock, from, phone, code, reply, dryRun) {
             } catch (err) {
               console.log(`Error descargando PDF ${url}:`, err.message);
               if (err.response?.status === 404) {
-                await reply({ type: 'text', text: `⚠️ El resultado aún no está disponible. Comunícate al *(755) 108 48 00*.` });
+                await reply({ type: 'text', text: pick(R.resultNotReady) });
               } else {
                 await reply({ type: 'text', text: `📄 Documento ${i + 1}: ${url}` });
                 entregados++;
@@ -563,13 +705,13 @@ async function handleCodeQuery(sock, from, phone, code, reply, dryRun) {
         }
 
         if (entregados > 0) {
-          await reply({ type: 'text', text: `✅ Resultados entregados.` });
+          await reply({ type: 'text', text: pick(R.resultDelivered) });
         }
       }
     }
   } catch (err) {
     console.error('[BOT] Error al procesar código en API:', err.message);
-    await reply({ type: 'text', text: `⚠️ Error consultando resultados. Intenta más tarde.` });
+    await reply({ type: 'text', text: pick(R.errorGeneric) });
   } finally {
     if (!dryRun && sock) {
       await sock.sendPresenceUpdate('paused', from);
@@ -581,7 +723,7 @@ async function handleCodeQuery(sock, from, phone, code, reply, dryRun) {
   if (session) {
     session.state = 'waiting_code';
   }
-  await reply({ type: 'text', text: `¿Tienes otro código que consultar? Indícalo, escribe *AGENDAR* para pedir una cita, *VER* para revisar servicios, o *no* para terminar.` });
+  await reply({ type: 'text', text: pick(R.askAnotherCode) });
 }
 
 // ==========================================
@@ -631,21 +773,19 @@ async function sendBroadcast(sock, clients, text, imagePath) {
 const botState = {
   qr: null,
   connected: false,
-  hasConnected: false
+  hasConnected: false,
+  readyAt: 0
 };
 
 async function startBot() {
   try {
     const baileys = await import('@whiskeysockets/baileys');
-    const {
-      default: makeWASocket,
-      useMultiFileAuthState,
-      DisconnectReason,
-      fetchLatestBaileysVersion
-    } = baileys;
+    const { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = baileys;
 
     const { state, saveCreds } = await useMultiFileAuthState(SESSION_PATH);
-    const { version } = await fetchLatestBaileysVersion();
+    const { version: latestVersion } = await fetchLatestBaileysVersion();
+    const version = latestVersion;
+    console.log(`[BAILEYS] Protocolo WhatsApp: ${version.join('.')}`);
 
     const sock = makeWASocket({
       version,
@@ -654,7 +794,9 @@ async function startBot() {
       connectTimeoutMs: 60000,
       keepAliveIntervalMs: 30000,
       qrTimeout: 40000,
-      defaultQueryTimeoutMs: 60000
+      defaultQueryTimeoutMs: 60000,
+      syncFullHistory: false,
+      markOnlineOnConnect: false
     });
 
     sockInstance = sock; // Guardar referencia activa
@@ -680,25 +822,24 @@ async function startBot() {
             reconnectAttempts++;
             console.log(`Intentando reconectar automáticamente... (Intento ${reconnectAttempts} de ${MAX_RECONNECT_ATTEMPTS})`);
             scheduleBotRestart(20000);
-          } else {
-            if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-              console.error('Se alcanzó el límite máximo de intentos de reconexión.');
-            }
+          } else if (!shouldReconnect) {
             if (!botState.hasConnected && canSendNotification(QR_NOTIFICATION_THROTTLE_KEY)) {
               console.log('[QR] Sesión cerrada por WhatsApp, se generará nuevo QR');
             }
             console.log('[SESSION] Sesión cerrada por el usuario, limpiando sesión...');
             botState.qr = null;
             botState.hasConnected = false;
-            // Limpiar archivos de credenciales de Baileys
             if (existsSync(SESSION_PATH)) {
               rmSync(SESSION_PATH, { recursive: true, force: true });
               console.log('[SESSION] Archivos de sesión de Baileys eliminados');
             }
-            // Limpiar estados de conversación en memoria
             userSessions.clear();
             notificationThrottle.clear();
             console.log('[SESSION] Estados de conversación y throttle en memoria limpiados');
+            reconnectAttempts = 0;
+            scheduleBotRestart(60000);
+          } else {
+            console.error('Se alcanzó el límite máximo de intentos de reconexión.');
             reconnectAttempts = 0;
             scheduleBotRestart(60000);
           }
@@ -710,6 +851,9 @@ async function startBot() {
           reconnectAttempts = 0;
           sockInstance = sock;
           console.log('Bot conectado a WhatsApp');
+          // Esperar 5s antes de aceptar mensajes para que WhatsApp termine de sincronizar historial
+          botState.readyAt = Date.now() + 5000;
+          console.log('[BOT] Listo para responder mensajes en 5 segundos...');
         }
       } catch (err) {
         console.error('[CONNECTION ERROR]', err);
@@ -726,38 +870,23 @@ async function startBot() {
 
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
       try {
-        // ── DIAGNÓSTICO 1: ¿Llega el evento a Baileys? ──
-        console.log(`[DIAG] messages.upsert disparado | type="${type}" | cantidad de mensajes: ${messages.length}`);
+        if (type !== 'notify') return;
 
-        if (type !== 'notify') {
-          console.log(`[DIAG] Ignorado: type="${type}" no es "notify"`);
+        // Ignorar mensajes que llegan durante la sincronización inicial del historial
+        if (botState.readyAt && Date.now() < botState.readyAt) {
+          console.log('[BOT] Mensaje ignorado durante sincronización inicial del historial');
           return;
         }
 
         for (const msg of messages) {
-          // ── DIAGNÓSTICO 2: Estructura cruda del mensaje ──
-          console.log(`[DIAG] Mensaje crudo recibido:`, JSON.stringify({
-            fromMe: msg.key?.fromMe,
-            remoteJid: msg.key?.remoteJid,
-            senderPn: msg.key?.senderPn,
-            pushName: msg.pushName,
-            messageType: msg.message ? Object.keys(msg.message) : null,
-            status: msg.status
-          }));
-
-          if (!msg.message) {
-            console.log('[DIAG] Ignorado: msg.message está vacío (sin contenido)');
-            continue;
-          }
-          if (msg.key.fromMe) {
-            console.log('[DIAG] Ignorado: mensaje enviado por el propio bot (fromMe=true)');
-            continue;
-          }
+          if (!msg.message) continue;
+          if (msg.key.fromMe) continue;
 
           const from = msg.key.remoteJid;
-          // Si el JID es @lid (ID de dispositivo vinculado), usar senderPn para responder
-          // Los mensajes enviados a @lid no son entregados por WhatsApp
-          const replyJid = msg.key.senderPn || from;
+          let replyJid = msg.key.senderPn || from;
+          if (replyJid.endsWith('@lid')) {
+            replyJid = replyJid.replace('@lid', '@s.whatsapp.net');
+          }
 
           const phone = (msg.key.senderPn || from)
             .replace('@s.whatsapp.net', '')
@@ -765,7 +894,7 @@ async function startBot() {
             .replace('@lid', '');
 
           const name = msg.pushName || 'desconocido';
-          console.log(`[DIAG] Procesando mensaje de: +${phone} (${name}) | JID original: ${from} | JID respuesta: ${replyJid}`);
+          console.log(`Mensaje recibido de: +${phone} (${name})`);
 
           const text =
             msg.message.conversation ||
@@ -774,24 +903,13 @@ async function startBot() {
             msg.message?.documentMessage?.caption ||
             '';
 
-          // ── DIAGNÓSTICO 3: ¿Se extrajo texto? ──
-          console.log(`[DIAG] Texto extraído: "${text}" | Tipo de mensaje detectado: ${
-            msg.message.conversation ? 'conversation' :
-            msg.message.extendedTextMessage ? 'extendedText' :
-            msg.message.imageMessage ? 'image' :
-            msg.message.documentMessage ? 'document' :
-            'DESCONOCIDO - keys: ' + Object.keys(msg.message).join(', ')
-          }`);
-
           if (!text) {
-            console.log('[DIAG] Ignorado: no se pudo extraer texto del mensaje.');
+            console.log('[BOT] Mensaje ignorado por no contener texto reconocible.');
             continue;
           }
 
-          // ── DIAGNÓSTICO 4: Entrando a processMessage ──
-          console.log(`[DIAG] Llamando processMessage para +${phone} con texto: "${text}"`);
+          console.log('[BOT] texto recibido:', text);
           await processMessage(sock, replyJid, phone, text, name, false);
-          console.log(`[DIAG] processMessage completado para +${phone}`);
         }
       } catch (err) {
         console.error('[MESSAGES ERROR] Error manejando mensaje de WhatsApp:', err);

@@ -1,0 +1,21 @@
+{
+  "name": "Consulta de Resultados - Laboratorio Clínico Integral",
+  "short_name": "Resultados Lab",
+  "description": "Consulta los resultados de tus análisis clínicos",
+  "start_url": "/consulta",
+  "display": "standalone",
+  "background_color": "#f0f2f5",
+  "theme_color": "#00509D",
+  "icons": [
+    {
+      "src": "/labtemp.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/labtemp.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

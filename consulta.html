@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#00509D">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/labtemp.png">
+<title>Consulta de Resultados</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --primary: #00509D;
+  --primary-dark: #003d7a;
+  --bg: #f0f2f5;
+  --card: #ffffff;
+  --text: #1a1a1a;
+  --muted: #666;
+  --border: #e0e0e0;
+  --success: #28a745;
+  --danger: #dc3545;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.header {
+  background: var(--primary);
+  color: white;
+  padding: 20px 16px;
+  text-align: center;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+.header h1 { font-size: 18px; font-weight: 600; }
+.header p { font-size: 13px; opacity: 0.9; margin-top: 4px; }
+.container {
+  flex: 1;
+  max-width: 500px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 16px;
+}
+.card {
+  background: var(--card);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  margin-bottom: 16px;
+}
+.form-group { margin-bottom: 16px; }
+.form-group label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.form-group input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  font-size: 16px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.form-group input:focus {
+  border-color: var(--primary);
+}
+.btn {
+  width: 100%;
+  padding: 14px;
+  border: none;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.1s;
+}
+.btn:active { transform: scale(0.98); }
+.btn-primary {
+  background: var(--primary);
+  color: white;
+}
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+.status {
+  text-align: center;
+  padding: 16px;
+  display: none;
+}
+.status.show { display: block; }
+.status.error { color: var(--danger); }
+.status.success { color: var(--success); }
+.status.loading { color: var(--muted); }
+.spinner {
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  border: 3px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 8px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.resultados { display: none; }
+.resultados.show { display: block; }
+.resultado-item {
+  background: var(--card);
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 10px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.resultado-item .icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: #e8f0fe;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.resultado-item .info { flex: 1; }
+.resultado-item .info .name {
+  font-weight: 600;
+  font-size: 14px;
+}
+.resultado-item .info .size {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.resultado-item a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 14px;
+  background: var(--primary);
+  color: white;
+  text-decoration: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.resultado-item a:active { opacity: 0.8; }
+.info-box {
+  background: #fff3cd;
+  color: #856404;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  margin-bottom: 16px;
+  display: none;
+}
+.info-box.show { display: block; }
+.install-banner {
+  display: none;
+  background: var(--primary);
+  color: white;
+  padding: 12px 16px;
+  text-align: center;
+  font-size: 14px;
+  cursor: pointer;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 20;
+}
+.install-banner.show { display: block; }
+.install-banner span { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>🔍 Consulta de Resultados</h1>
+  <p>Laboratorio Clínico Integral</p>
+</div>
+
+<div class="container">
+  <div class="card">
+    <div class="form-group">
+      <label for="phone">📱 Tu número de teléfono</label>
+      <input type="tel" id="phone" inputmode="numeric" placeholder="Ej: 7551272444" autocomplete="tel">
+    </div>
+    <div class="form-group">
+      <label for="code">🔢 Código de análisis</label>
+      <input type="text" id="code" inputmode="text" placeholder="Ej: 34643 o BARCODE" autocomplete="off">
+    </div>
+    <button class="btn btn-primary" id="btnBuscar" onclick="buscar()">Buscar resultados</button>
+  </div>
+
+  <div class="status" id="status"></div>
+  <div class="info-box" id="infoBox"></div>
+  <div class="resultados" id="resultados"></div>
+</div>
+
+<div class="install-banner" id="installBanner" onclick="installPWA()">
+  📲 Instala esta app para acceso rápido — <span>tocar aquí</span>
+</div>
+
+<script>
+let deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  document.getElementById('installBanner').classList.add('show');
+});
+
+function installPWA() {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  deferredPrompt.userChoice.then(() => {
+    deferredPrompt = null;
+    document.getElementById('installBanner').classList.remove('show');
+  });
+}
+
+document.getElementById('phone').addEventListener('input', function() {
+  this.value = this.value.replace(/\D/g, '');
+});
+
+document.getElementById('code').addEventListener('input', function() {
+  this.value = this.value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
+});
+
+document.getElementById('code').addEventListener('keydown', e => {
+  if (e.key === 'Enter') buscar();
+});
+
+async function buscar() {
+  const phone = document.getElementById('phone').value.trim();
+  const code = document.getElementById('code').value.trim();
+
+  if (!phone || !code) {
+    mostrarStatus('Completa ambos campos', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('btnBuscar');
+  const status = document.getElementById('status');
+  const resultados = document.getElementById('resultados');
+  const infoBox = document.getElementById('infoBox');
+
+  resultados.classList.remove('show');
+  resultados.innerHTML = '';
+  infoBox.classList.remove('show');
+  btn.disabled = true;
+  mostrarStatus('Consultando...', 'loading');
+
+  try {
+    const res = await fetch('/api/consulta', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, code })
+    });
+    const data = await res.json();
+
+    ocultarStatus();
+
+    if (data.error) {
+      mostrarStatus(data.error, 'error');
+    } else if (data.status === 'pendiente') {
+      infoBox.textContent = '🚫 Pendiente de pago. Contacta al (755) 108 48 00.';
+      infoBox.classList.add('show');
+    } else if (data.status === 'ok' && data.docs) {
+      infoBox.textContent = '✅ Resultados listos';
+      infoBox.classList.add('show');
+      infoBox.style.background = '#d4edda';
+      infoBox.style.color = '#155724';
+
+      resultados.innerHTML = data.docs.map((doc, i) => `
+        <div class="resultado-item">
+          <div class="icon">📄</div>
+          <div class="info">
+            <div class="name">${doc.name}</div>
+            <div class="size">Documento ${i + 1} de ${data.docs.length}</div>
+          </div>
+          <a href="${doc.url}" target="_blank" rel="noopener" download="${doc.name}.pdf">Abrir</a>
+        </div>
+      `).join('');
+      resultados.classList.add('show');
+    } else {
+      mostrarStatus('No se encontraron resultados para ese código', 'error');
+    }
+  } catch (err) {
+    mostrarStatus('Error de conexión. Intenta más tarde.', 'error');
+    console.error(err);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function mostrarStatus(msg, tipo) {
+  const el = document.getElementById('status');
+  el.className = 'status show ' + tipo;
+  el.innerHTML = tipo === 'loading' ? '<div class="spinner"></div>' + msg : msg;
+}
+
+function ocultarStatus() {
+  document.getElementById('status').className = 'status';
+}
+</script>
+</body>
+</html>

@@ -5,6 +5,9 @@
   "scripts": {
     "start": "node --max-old-space-size=512 index.js"
   },
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "dependencies": {
     "@whiskeysockets/baileys": "^6.7.9",
     "axios": "^1.14.0",

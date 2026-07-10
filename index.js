@@ -13,6 +13,11 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
+
+app.use('/public', express.static(path.join(__dirname, 'public')));
+app.get('/manifest.json', (req, res) => res.sendFile(path.join(__dirname, 'public', 'manifest.json')));
+app.get('/manifest_admin.json', (req, res) => res.sendFile(path.join(__dirname, 'public', 'manifest_admin.json')));
+app.get('/sw.js', (req, res) => res.sendFile(path.join(__dirname, 'public', 'sw.js')));
 app.use((req, res, next) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.setHeader('Pragma', 'no-cache');
@@ -49,6 +54,15 @@ const upload = multer({ storage: storage });
 // ==========================================
 
 // Servir lab.jpg para el simulador y vistas si existe
+app.get('/labtemp.png', (req, res) => {
+  const iconPath = path.join(__dirname, 'labtemp.png');
+  if (fs.existsSync(iconPath)) {
+    res.sendFile(iconPath);
+  } else {
+    res.status(404).send('Icono no disponible');
+  }
+});
+
 app.get('/lab.jpg', (req, res) => {
   const logoPath = path.join(__dirname, 'lab.jpg');
   if (fs.existsSync(logoPath)) {
@@ -91,6 +105,15 @@ app.get('/top-analyses-dashboard', (req, res) => {
 // Administrador de Agenda
 app.get('/agenda-dashboard', (req, res) => {
   res.sendFile(path.join(__dirname, 'agenda.html'));
+});
+
+// Consulta pública de resultados (PWA)
+app.get('/consulta', (req, res) => {
+  res.sendFile(path.join(__dirname, 'consulta.html'));
+});
+
+app.get('/consulta_admin', (req, res) => {
+  res.sendFile(path.join(__dirname, 'consulta_admin.html'));
 });
 
 // Vincular QR de WhatsApp (Rebranding Clínico)
@@ -564,6 +587,53 @@ app.delete('/api/agenda/:id', async (req, res) => {
     res.sendStatus(200);
   } catch (e) {
     res.status(500).json({ error: e.message });
+  }
+});
+
+// ==========================================
+// ENDPOINT PÚBLICO DE CONSULTA (PWA)
+// ==========================================
+
+app.post('/api/consulta', async (req, res) => {
+  try {
+    const { phone, code } = req.body;
+    if (!phone || !code) {
+      return res.status(400).json({ error: 'Teléfono y código requeridos' });
+    }
+
+    const normalizedPhone = phone.replace(/\D/g, '').slice(-10);
+    const apiUrl = process.env.API_URL || 'https://storelab.laboratorioclinicointegral.com/api';
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+    const response = await fetch(`${apiUrl}/get-service-by-barcode/${normalizedPhone}/${code}`, {
+      signal: controller.signal
+    });
+    clearTimeout(timeout);
+    const data = await response.json();
+
+    if (!data || !data.barcode) {
+      return res.json({ error: 'No se encontró el código' });
+    }
+
+    if (data.status_id === 1) {
+      return res.json({ status: 'pendiente' });
+    }
+
+    if (data.status_id === 2 && data.urls) {
+      const docs = data.urls
+        .filter((doc, i) => doc['path' + i])
+        .map((doc, i) => ({
+          name: doc['name' + i] || `Resultado ${i + 1}`,
+          url: doc['path' + i]
+        }));
+      return res.json({ status: 'ok', docs });
+    }
+
+    res.json({ error: 'Estado no reconocido' });
+  } catch (err) {
+    console.error('[CONSULTA API] Error:', err.message);
+    res.status(500).json({ error: 'Error al consultar. Intenta más tarde.' });
   }
 });
 
