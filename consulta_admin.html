@@ -125,12 +125,20 @@ body {
 .resultado-item .info { flex: 1; }
 .resultado-item .info .name { font-weight: 600; font-size: 14px; }
 .resultado-item .info .size { font-size: 12px; color: var(--muted); margin-top: 2px; }
-.resultado-item a {
-  display: inline-flex; align-items: center; gap: 4px;
-  padding: 8px 14px; background: var(--primary); color: white;
-  text-decoration: none; border-radius: 8px; font-size: 13px; font-weight: 500;
+.resultado-item .actions {
+  display: flex; gap: 6px; flex-shrink: 0;
 }
-.resultado-item a:active { opacity: 0.8; }
+.resultado-item .actions button,
+.resultado-item .actions a {
+  display: inline-flex; align-items: center; justify-content: center; gap: 3px;
+  padding: 8px 12px; border: none; border-radius: 8px;
+  font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer;
+  text-decoration: none; transition: opacity 0.2s; white-space: nowrap;
+}
+.resultado-item .actions button:active,
+.resultado-item .actions a:active { opacity: 0.7; }
+.btn-download { background: var(--primary); color: white; }
+.btn-share { background: #25D366; color: white; }
 .info-box {
   background: #fff3cd; color: #856404; padding: 12px 14px;
   border-radius: 10px; font-size: 14px; margin-bottom: 16px; display: none;
@@ -207,7 +215,10 @@ async function buscar() {
             <div class="name">${doc.name}</div>
             <div class="size">Documento ${i + 1} de ${data.docs.length}</div>
           </div>
-          <a href="${doc.url}" target="_blank" rel="noopener" download="${doc.name}.pdf">Abrir</a>
+          <div class="actions">
+            <a class="btn-download" href="${doc.url}" target="_blank" rel="noopener" download="${doc.name}.pdf">⬇ Descargar</a>
+            <button class="btn-share" onclick="compartir('${doc.url}', '${doc.name}')">📤 Compartir</button>
+          </div>
         </div>
       `).join('');
       resultados.classList.add('show');
@@ -227,6 +238,18 @@ function mostrarStatus(msg, tipo) {
   el.innerHTML = tipo === 'loading' ? '<div class="spinner"></div>' + msg : msg;
 }
 function ocultarStatus() { document.getElementById('status').className = 'status'; }
+
+function compartir(url, name) {
+  if (navigator.share) {
+    navigator.share({ title: name, text: 'Resultado de laboratorio', url: url })
+      .catch(() => {});
+  } else {
+    navigator.clipboard.writeText(url).then(() => {
+      mostrarStatus('Enlace copiado al portapapeles', 'success');
+      setTimeout(ocultarStatus, 2000);
+    });
+  }
+}
 </script>
 </body>
 </html>
