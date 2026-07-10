@@ -216,8 +216,8 @@ async function buscar() {
             <div class="size">Documento ${i + 1} de ${data.docs.length}</div>
           </div>
           <div class="actions">
-            <a class="btn-download" href="${doc.url}" target="_blank" rel="noopener" download="${doc.name}.pdf">⬇ Descargar</a>
-            <button class="btn-share" onclick="compartir('${doc.url}', '${doc.name}')">📤 Compartir</button>
+            <a class="btn-download" href="${doc.url}" target="_blank" rel="noopener" download="${doc.name}.pdf" title="Descargar">⇩</a>
+            <button class="btn-share" onclick="compartir('${doc.url}', '${doc.name}')" title="Compartir">⇗</button>
           </div>
         </div>
       `).join('');
