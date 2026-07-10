@@ -193,6 +193,64 @@ async function processMessage(sock, from, phone, text, pushName = 'desconocido',
   // Solo se disparan si el usuario está en un estado neutral (null o waiting_code)
   const cleanText = normalizedText.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); // Quitar acentos
   const isNeutralState = session.state === null || session.state === 'waiting_code';
+
+  // SALUDO: siempre tiene prioridad, sin importar el estado actual
+  if (isGreeting(text)) {
+    console.log(`[BOT] Saludo detectado de +${phone}, reseteando estado de sesión`);
+    // Resetear sesión para que el saludo siempre arranque flujo limpio
+    userSessions.delete(from);
+    session = { state: null, name: null, lastActive: Date.now() };
+    userSessions.set(from, session);
+
+    let clientName = null;
+    if (!dryRun) {
+      const client = await db.getUser(phone);
+      clientName = client?.name;
+      if (!clientName) {
+        clientName = await getClientName(phone, null);
+        if (clientName) {
+          await db.createUser(phone, clientName);
+        }
+      }
+    } else {
+      clientName = session.name;
+    }
+
+    const logoPath = path.join(__dirname, '../lab.jpg');
+    if (fs.existsSync(logoPath)) {
+      await reply({ type: 'image', url: dryRun ? '/lab.jpg' : logoPath, text: `*Laboratorio Clínico Integral* 🏥` });
+    } else {
+      await reply({ type: 'text', text: `*Laboratorio Clínico Integral* 🏥` });
+    }
+
+    const welcomePromos = await db.getActivePromotions('WELCOME');
+    for (const promo of welcomePromos) {
+      await reply({
+        type: promo.image_url ? 'image' : 'text',
+        url: promo.image_url,
+        text: promo.text
+      });
+    }
+
+    let greetingNotice = '';
+    if (isOutsideBusinessHours()) {
+      greetingNotice = `⚠️ *Aviso de Horario:* Actualmente nuestras oficinas físicas están cerradas (Lun-Vie 7am-5pm). Sin embargo, nuestro sistema automático está activo 24/7 para entregarte resultados o agendar tu cita. 🤖\n\n`;
+    }
+
+    await reply({
+      type: 'text',
+      text: `${greetingNotice}📍 Saturno 15, Zona Industrial, Zihuatanejo, Gro.\n🕐 Horario: Lunes a Viernes 7:00am - 5:00pm\n🌐 https://laboratorioclinicointegral.com/\n\n${clientName ? `Bienvenido 👋 *${clientName}*` : 'Bienvenido 👋'}`
+    });
+
+    if (clientName) {
+      session.state = 'waiting_code';
+      await reply({ type: 'text', text: `Indica tu *Código de análisis*, escribe *AGENDAR* para pedir una cita, o *VER* para revisar nuestros servicios:` });
+    } else {
+      session.state = 'asking_name';
+      await reply({ type: 'text', text: `Para poder brindarte un mejor servicio, ¿cuál es tu nombre y apellido?` });
+    }
+    return responses;
+  }
   
   if (isNeutralState) {
     if (['ayuno', 'requisito', 'requisitos', 'preparacion', 'prepararse'].some(k => cleanText.includes(k))) {
@@ -371,7 +429,7 @@ async function processMessage(sock, from, phone, text, pushName = 'desconocido',
           const details = `schedule_date=${scheduleDate}`;
 
           // Log de confirmación de cita (sin envío de email)
-          console.log(`[CITA CONFIRMADA] Teléfono: ${phoneNumber}, Fecha: ${scheduleText}, Detalles: ${details}`);
+          console.log(`[CITA CONFIRMADA] Teléfono: ${phone}, Paciente: ${client?.name || 'Paciente'}, Análisis: ${session.selectedAnalysisName}, Fecha: ${scheduleText}`);
         } catch (err) {
           console.error('Error preparando o enviando email de cita:', err);
         }
@@ -382,59 +440,6 @@ async function processMessage(sock, from, phone, text, pushName = 'desconocido',
     } else {
       session.state = 'waiting_code';
       await reply({ type: 'text', text: `Cita cancelada. Si necesitas algo más, indica tu *Código de análisis*, escribe *AGENDAR* o *VER*.` });
-    }
-    return responses;
-  }
-
-  // 3. SALUDO INICIAL
-  if (isGreeting(text)) {
-    let clientName = session.name;
-    if (!clientName && !dryRun) {
-      const client = await db.getUser(phone);
-      clientName = client?.name;
-
-      // Si no existe en SQLite, intentar obtener de la API central
-      if (!clientName) {
-        clientName = await getClientName(phone, null);
-        if (clientName) {
-          await db.createUser(phone, clientName);
-        }
-      }
-    }
-
-    const logoPath = path.join(__dirname, '../lab.jpg');
-    if (fs.existsSync(logoPath)) {
-      await reply({ type: 'image', url: dryRun ? '/lab.jpg' : logoPath, text: `*Laboratorio Clínico Integral* 🏥` });
-    } else {
-      await reply({ type: 'text', text: `*Laboratorio Clínico Integral* 🏥` });
-    }
-
-    // Inyectar banner promocional WELCOME
-    const welcomePromos = await db.getActivePromotions('WELCOME');
-    for (const promo of welcomePromos) {
-      await reply({
-        type: promo.image_url ? 'image' : 'text',
-        url: promo.image_url,
-        text: promo.text
-      });
-    }
-
-    let greetingNotice = '';
-    if (isOutsideBusinessHours()) {
-      greetingNotice = `⚠️ *Aviso de Horario:* Actualmente nuestras oficinas físicas están cerradas (Lun-Vie 7am-5pm). Sin embargo, nuestro sistema automático está activo 24/7 para entregarte resultados o agendar tu cita. 🤖\n\n`;
-    }
-
-    await reply({
-      type: 'text',
-      text: `${greetingNotice}📍 Saturno 15, Zona Industrial, Zihuatanejo, Gro.\n🕐 Horario: Lunes a Viernes 7:00am - 5:00pm\n🌐 https://laboratorioclinicointegral.com/\n\n${clientName ? `Bienvenido 👋 *${clientName}*` : 'Bienvenido 👋'}`
-    });
-
-    if (clientName) {
-      session.state = 'waiting_code';
-      await reply({ type: 'text', text: `Indica tu *Código de análisis*, escribe *AGENDAR* para pedir una cita, o *VER* para revisar nuestros servicios:` });
-    } else {
-      session.state = 'asking_name';
-      await reply({ type: 'text', text: `Para poder brindarte un mejor servicio, ¿cuál es tu nombre y apellido?` });
     }
     return responses;
   }
@@ -673,9 +678,15 @@ async function startBot() {
             console.log('[SESSION] Sesión cerrada por el usuario, limpiando sesión...');
             botState.qr = null;
             botState.hasConnected = false;
+            // Limpiar archivos de credenciales de Baileys
             if (existsSync(SESSION_PATH)) {
               rmSync(SESSION_PATH, { recursive: true, force: true });
+              console.log('[SESSION] Archivos de sesión de Baileys eliminados');
             }
+            // Limpiar estados de conversación en memoria
+            userSessions.clear();
+            notificationThrottle.clear();
+            console.log('[SESSION] Estados de conversación y throttle en memoria limpiados');
             reconnectAttempts = 0;
             scheduleBotRestart(60000);
           }
