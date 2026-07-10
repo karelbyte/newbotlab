@@ -149,27 +149,39 @@ async function processMessage(sock, from, phone, text, pushName = 'desconocido',
     if (dryRun) {
       responses.push(msg);
     } else if (sock) {
-      if (msg.type === 'text') {
-        await sock.sendMessage(from, { text: msg.text });
-      } else if (msg.type === 'image') {
-        let absolutePath = msg.url;
-        if (!existsSync(absolutePath)) {
-          if (msg.url.startsWith('/promos_imgs/')) {
-            absolutePath = path.join(PROMOS_IMGS_PATH, msg.url.replace('/promos_imgs/', ''));
-          } else {
-            const webPath = msg.url.startsWith('/') ? msg.url.slice(1) : msg.url;
-            absolutePath = path.join(__dirname, '..', webPath);
+      try {
+        if (msg.type === 'text') {
+          console.log(`[REPLY] Enviando texto a ${from}: "${msg.text?.substring(0, 60)}..."`);
+          await sock.sendMessage(from, { text: msg.text });
+          console.log(`[REPLY] ✅ Texto enviado a ${from}`);
+        } else if (msg.type === 'image') {
+          let absolutePath = msg.url;
+          if (!existsSync(absolutePath)) {
+            if (msg.url.startsWith('/promos_imgs/')) {
+              absolutePath = path.join(PROMOS_IMGS_PATH, msg.url.replace('/promos_imgs/', ''));
+            } else {
+              const webPath = msg.url.startsWith('/') ? msg.url.slice(1) : msg.url;
+              absolutePath = path.join(__dirname, '..', webPath);
+            }
           }
+          console.log(`[REPLY] Enviando imagen a ${from}: ${absolutePath}`);
+          await sock.sendMessage(from, { image: { url: absolutePath }, caption: msg.text });
+          console.log(`[REPLY] ✅ Imagen enviada a ${from}`);
+        } else if (msg.type === 'pdf') {
+          console.log(`[REPLY] Enviando PDF a ${from}: ${msg.fileName}`);
+          await sock.sendMessage(from, {
+            document: { url: msg.url },
+            mimetype: 'application/pdf',
+            fileName: msg.fileName,
+            caption: msg.text
+          });
+          console.log(`[REPLY] ✅ PDF enviado a ${from}`);
         }
-        await sock.sendMessage(from, { image: { url: absolutePath }, caption: msg.text });
-      } else if (msg.type === 'pdf') {
-        await sock.sendMessage(from, {
-          document: { url: msg.url },
-          mimetype: 'application/pdf',
-          fileName: msg.fileName,
-          caption: msg.text
-        });
+      } catch (err) {
+        console.error(`[REPLY] ❌ Error enviando mensaje a ${from}:`, err.message, err.stack?.split('\n')[1]);
       }
+    } else {
+      console.warn(`[REPLY] ⚠️ sock no disponible, no se pudo enviar mensaje a ${from}`);
     }
   }
 
