@@ -263,6 +263,11 @@ async function getClientName(phone, fallback) {
   return fallback;
 }
 
+// Normalizar JID para números mexicanos (521xxx → 52xxx)
+function normalizeJid(jid) {
+  return jid.replace(/^521(\d{10})@/, '52$1@');
+}
+
 // Determinar si nos encontramos fuera del horario laboral (Lun-Vie 7am-5pm)
 function isOutsideBusinessHours() {
   const now = new Date();
@@ -277,6 +282,7 @@ function isOutsideBusinessHours() {
 // PROCESADOR UNIFICADO DE MENSAJES (MÁQUINA DE ESTADOS)
 // ==========================================
 async function processMessage(sock, from, phone, text, pushName = 'desconocido', dryRun = false) {
+  from = normalizeJid(from);
   const responses = [];
   const normalizedText = text.toLowerCase().trim();
   const codeCandidate = text.toUpperCase().trim();
